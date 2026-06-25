@@ -28,6 +28,16 @@ export async function sendWhatsAppViaCRM(
 
   // Format the phone number (E.164 format)
   let cleanPhone = phone.replace(/[^0-9]/g, "");
+  
+  // Strip international dialing double zero prefix if it is followed by 91
+  if (cleanPhone.startsWith("0091") && cleanPhone.length === 14) {
+    cleanPhone = cleanPhone.substring(2);
+  }
+  // Strip leading local trunk zero if followed by 10 digits
+  if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+    cleanPhone = cleanPhone.substring(1);
+  }
+
   if (cleanPhone.length === 10) {
     cleanPhone = "91" + cleanPhone; // Fallback to Indian prefix if 10-digit
   }
