@@ -15,7 +15,8 @@ import {
   Save, 
   Database,
   FileSpreadsheet,
-  Trash2
+  Trash2,
+  Send
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Papa from "papaparse";
@@ -866,7 +867,16 @@ export function LeadPipeline() {
             </button>
           )}
 
-          {/* Bulk Send WhatsApp button removed to eliminate automation risk */}
+          {leads.length > 0 && (
+            <button 
+              onClick={handleBulkSendWhatsApp}
+              disabled={isBatchSendingWhatsApp}
+              className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm mr-2"
+            >
+              <Send size={14} />
+              {isBatchSendingWhatsApp ? "SENDING..." : "SEND WHATSAPP"}
+            </button>
+          )}
 
           <button 
             onClick={() => fileInputRef.current?.click()}
