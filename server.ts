@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import { pathToFileURL } from "url";
 import { createServer as createViteServer } from "vite";
-import { chromium } from "playwright";
 import AdmZip from "adm-zip";
 
 import fs from "fs";
