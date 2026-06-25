@@ -10,11 +10,13 @@ import { getCitiesForLocation } from "./lib/cityDatabase.js";
 import { ScraperEngine, LeadData } from "./lib/ScraperEngine.js";
 
 // ... existing code ...
-
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
+
+// Force Playwright to use a local write-accessible directory for browser storage
+process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(process.cwd(), ".playwright-browsers");
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -111,10 +113,16 @@ async function launchBrowser(options?: any) {
     return await chromium.launch(launchOptions);
   } catch (err: any) {
     if (err.message && (err.message.includes("Executable doesn't exist") || err.message.includes("playwright install"))) {
-      console.log("[Playwright Self-Healing] Chromium binary missing. Installing...");
+      console.log("[Playwright Self-Healing] Chromium binary missing. Installing locally...");
       const { execSync } = await import("child_process");
       try {
-        execSync("npx playwright install chromium", { stdio: "inherit" });
+        const nodePath = process.execPath;
+        const playwrightCli = path.join(process.cwd(), "node_modules", "playwright", "cli.js");
+        console.log(`[Playwright Self-Healing] Launching installer: "${nodePath}" "${playwrightCli}" install chromium`);
+        execSync(`"${nodePath}" "${playwrightCli}" install chromium`, { 
+          stdio: "inherit",
+          env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.join(process.cwd(), ".playwright-browsers") }
+        });
         console.log("[Playwright Self-Healing] Installation finished. Retrying launch...");
         return await chromium.launch(launchOptions);
       } catch (installErr: any) {
