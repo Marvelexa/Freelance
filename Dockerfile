@@ -8,7 +8,7 @@ COPY package*.json ./
 
 # Skip browser download during install since they are pre-baked in the base image
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy application files
 COPY . .
