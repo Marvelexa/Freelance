@@ -96,11 +96,40 @@ function isEcommerceNiche(categoryStr: string, finalNiche?: string): boolean {
   );
 }
 
+async function launchBrowser(options?: any) {
+  const { chromium } = await import("playwright");
+  const launchOptions = options || {
+    headless: true,
+    args: [
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+    ]
+  };
+  try {
+    return await chromium.launch(launchOptions);
+  } catch (err: any) {
+    if (err.message && (err.message.includes("Executable doesn't exist") || err.message.includes("playwright install"))) {
+      console.log("[Playwright Self-Healing] Chromium binary missing. Installing...");
+      const { execSync } = await import("child_process");
+      try {
+        execSync("npx playwright install chromium", { stdio: "inherit" });
+        console.log("[Playwright Self-Healing] Installation finished. Retrying launch...");
+        return await chromium.launch(launchOptions);
+      } catch (installErr: any) {
+        console.error("[Playwright Self-Healing] Failed to install chromium:", installErr.message || installErr);
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
+
 async function extractWebsiteCatalog(url: string): Promise<string> {
   if (!url) return "No website provided.";
   console.log(`[Outreach Factory] Scopes scraping website catalog from: ${url}`);
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchBrowser({ headless: true });
   try {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
@@ -1248,15 +1277,7 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
 
       // 2. Playwright Video Recording with Auto-Scroll
       let recordingStart = Date.now();
-      const browser = await chromium.launch({
-        headless: true,
-        args: [
-          "--disable-gpu",
-          "--disable-dev-shm-usage",
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-        ]
-      });
+      const browser = await launchBrowser();
       rawVideoPath = "";
       try {
         const context = await browser.newContext({
