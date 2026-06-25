@@ -14,8 +14,10 @@ import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
-// Force Playwright to use a local write-accessible directory for browser storage
-process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(process.cwd(), ".playwright-browsers");
+// Force Playwright to use a local write-accessible directory for browser storage if not pre-defined (e.g., in Docker)
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(process.cwd(), ".playwright-browsers");
+}
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -120,7 +122,7 @@ async function launchBrowser(options?: any) {
         console.log(`[Playwright Self-Healing] Launching installer: "${nodePath}" "${playwrightCli}" install chromium`);
         execSync(`"${nodePath}" "${playwrightCli}" install chromium`, { 
           stdio: "inherit",
-          env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.join(process.cwd(), ".playwright-browsers") }
+          env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(process.cwd(), ".playwright-browsers") }
         });
         console.log("[Playwright Self-Healing] Installation finished. Retrying launch...");
         return await chromium.launch(launchOptions);
