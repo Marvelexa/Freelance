@@ -71,10 +71,19 @@ export async function sendWhatsAppMessage(
     return { success: false, reason: "Invalid phone number format" };
   }
 
-  // Format Indian numbers starting with '0' (e.g. 09876543210 -> 919876543210) or 10 digits (e.g. 9876543210 -> 919876543210)
-  if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+  // Strip international dialing double zero prefix if it starts with 0091
+  if (cleanPhone.startsWith("0091")) {
+    cleanPhone = cleanPhone.substring(2);
+  }
+  
+  // Format Indian numbers starting with '910' (e.g. +91 09876543210 -> 9109876543210 -> 919876543210)
+  if (cleanPhone.startsWith("910") && cleanPhone.length === 13) {
+    cleanPhone = "91" + cleanPhone.substring(3);
+  } else if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+    // Format Indian numbers starting with '0' (e.g. 09876543210 -> 919876543210)
     cleanPhone = "91" + cleanPhone.substring(1);
   } else if (cleanPhone.length === 10) {
+    // Format Indian numbers without prefix (e.g. 9876543210 -> 919876543210)
     cleanPhone = "91" + cleanPhone;
   }
 

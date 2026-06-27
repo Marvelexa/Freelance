@@ -29,20 +29,23 @@ export async function sendWhatsAppViaCRM(
   // Format the phone number (E.164 format)
   let cleanPhone = phone.replace(/[^0-9]/g, "");
   
-  // Strip international dialing double zero prefix if it is followed by 91
-  if (cleanPhone.startsWith("0091") && cleanPhone.length === 14) {
+  // Strip international dialing double zero prefix if it starts with 0091
+  if (cleanPhone.startsWith("0091")) {
     cleanPhone = cleanPhone.substring(2);
   }
-  // Strip leading local trunk zero if followed by 10 digits
+  
+  // Strip leading local trunk zero after country code (e.g. +91 09876543210 -> 9109876543210 -> 919876543210)
+  if (cleanPhone.startsWith("910") && cleanPhone.length === 13) {
+    cleanPhone = "91" + cleanPhone.substring(3);
+  }
+
+  // Strip leading local trunk zero if followed by 10 digits (e.g. 09876543210 -> 9876543210)
   if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
     cleanPhone = cleanPhone.substring(1);
   }
 
   if (cleanPhone.length === 10) {
     cleanPhone = "91" + cleanPhone; // Fallback to Indian prefix if 10-digit
-  }
-  if (!cleanPhone.startsWith("+")) {
-    cleanPhone = "+" + cleanPhone;
   }
 
   try {

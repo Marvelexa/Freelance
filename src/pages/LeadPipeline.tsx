@@ -16,7 +16,9 @@ import {
   Database,
   FileSpreadsheet,
   Trash2,
-  Send
+  Send,
+  Settings,
+  Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Papa from "papaparse";
@@ -85,6 +87,7 @@ export function LeadPipeline() {
 
   // WhatsApp Bulk Sending states
   const [isBatchSendingWhatsApp, setIsBatchSendingWhatsApp] = useState(false);
+  const [isSendingSingleWhatsApp, setIsSendingSingleWhatsApp] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendCurrentIndex, setSendCurrentIndex] = useState(0);
   const [sendTotalCount, setSendTotalCount] = useState(0);
@@ -93,6 +96,62 @@ export function LeadPipeline() {
   const abortBatchSendRef = useRef(false);
   const [copied, setCopied] = useState(false);
   
+  // CRM Settings overrides
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("WACRM_TEST_API_KEY") || "");
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState<"pipeline" | "videos">("pipeline");
+
+  useEffect(() => {
+    localStorage.setItem("WACRM_TEST_API_KEY", apiKey);
+  }, [apiKey]);
+
+  // Template System states
+  const [templateText, setTemplateText] = useState(() => 
+    localStorage.getItem("WACRM_OUTREACH_TEMPLATE") || 
+    "Hello! I made this sample website for {name} — saw your awesome reviews about your beautiful collection of ethnic wear and the very friendly, attentive staff. Your clothing store deserves to show up properly online. While many agencies charge more, if you like it, I can customize this and make it live in 1 week with complete premium features and all integrations for just $500!"
+  );
+  const [useTemplate, setUseTemplate] = useState(() => 
+    localStorage.getItem("WACRM_USE_TEMPLATE") === "true"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("WACRM_OUTREACH_TEMPLATE", templateText);
+  }, [templateText]);
+
+  useEffect(() => {
+    localStorage.setItem("WACRM_USE_TEMPLATE", String(useTemplate));
+  }, [useTemplate]);
+
+  // Dynamically format template message for the active outreach lead
+  useEffect(() => {
+    if (activeOutreachLead && useTemplate && templateText) {
+      const formatted = templateText
+        .replace(/\{name\}/g, activeOutreachLead.name)
+        .replace(/\(business name\)/g, activeOutreachLead.name)
+        .replace(/\{\{1\}\}/g, activeOutreachLead.name);
+      setOutreachMessage(formatted);
+    }
+  }, [activeOutreachLead, useTemplate, templateText]);
+
+  // Function to apply template text to all leads in one click
+  const handleApplyTemplateToAll = () => {
+    if (!templateText) {
+      alert("Please enter template text first.");
+      return;
+    }
+    if (!confirm("Are you sure you want to overwrite outreach messages for all leads using this template?")) {
+      return;
+    }
+    setLeads(prev => prev.map(l => ({
+      ...l,
+      outreachMessage: templateText
+        .replace(/\{name\}/g, l.name)
+        .replace(/\(business name\)/g, l.name)
+        .replace(/\{\{1\}\}/g, l.name)
+    })));
+    alert("✓ Template applied to all leads successfully!");
+  };
+
   const hasMockData = leads.some(l => l.isMock);
 
   // Manage rate limit countdown
@@ -725,6 +784,36 @@ export function LeadPipeline() {
     setIsBatchGenerating(false);
   };
 
+  const handleSendSingleWhatsApp = async () => {
+    if (!activeOutreachLead) return;
+    setIsSendingSingleWhatsApp(true);
+    try {
+      const response = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: activeOutreachLead.phone,
+          message: outreachMessage,
+          videoUrl: activeOutreachLead.videoUrl,
+          apiKey: apiKey.trim() || undefined,
+          name: activeOutreachLead.name
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP error ${response.status}`);
+      }
+
+      alert("✓ Message sent successfully via CRM API!");
+      setLeads(prev => prev.map(l => l.id === activeOutreachLead.id ? { ...l, whatsappStatus: 'sent' } : l));
+    } catch (err: any) {
+      alert(`✗ Failed to send message: ${err.message || String(err)}`);
+    } finally {
+      setIsSendingSingleWhatsApp(false);
+    }
+  };
+
   const handleBulkSendWhatsApp = async () => {
     const eligibleLeads = leads.filter(l => {
       const cleanPhone = l.phone ? l.phone.replace(/[^0-9]/g, "") : "";
@@ -766,7 +855,9 @@ export function LeadPipeline() {
           body: JSON.stringify({
             phone: lead.phone,
             message: lead.outreachMessage,
-            videoUrl: lead.videoUrl
+            videoUrl: lead.videoUrl,
+            apiKey: apiKey.trim() || undefined,
+            name: lead.name
           }),
         });
 
@@ -798,22 +889,7 @@ export function LeadPipeline() {
       }
 
       if (i < eligibleLeads.length - 1) {
-        const delayMs = Math.floor(Math.random() * (120000 - 60000 + 1)) + 60000;
-        const delaySec = Math.round(delayMs / 1000);
-        setSendLogs(prev => [...prev, `  ⏱️ Cooling down for ${delaySec}s to mimic human pacing and prevent ban...`]);
-        
-        let aborted = false;
-        for (let sec = 0; sec < delaySec; sec++) {
-          if (abortBatchSendRef.current) {
-            aborted = true;
-            break;
-          }
-          await new Promise(r => setTimeout(r, 1000));
-        }
-        if (aborted) {
-          setSendLogs(prev => [...prev, "🛑 WhatsApp bulk sending cancelled by user."]);
-          break;
-        }
+        await new Promise(r => setTimeout(r, 500)); // 500ms short delay
       }
     }
 
@@ -838,109 +914,239 @@ export function LeadPipeline() {
         className="hidden"
       />
 
-      <div className="px-10 flex py-6 border-b border-gray-100 items-center justify-between shrink-0 bg-white">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate("/")}
-            className="w-10 h-10 rounded-full border border-gray-100 hover:bg-gray-50 flex items-center justify-center text-gray-500 transition-colors cursor-pointer"
-            title="Go Back"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-900">Lead Pipeline</h1>
-            <p className="text-xs text-blue-600 font-medium">
-              {leads.length} businesses active in "{searchLocation}"
-            </p>
+      <div className="px-10 py-6 border-b border-gray-100 bg-white flex flex-col gap-4 shrink-0 shadow-sm">
+        {/* Title row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate("/")}
+              className="w-10 h-10 rounded-full border border-gray-100 hover:bg-gray-50 flex items-center justify-center text-gray-500 transition-colors cursor-pointer"
+              title="Go Back"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-gray-900">Lead Pipeline</h1>
+              <p className="text-xs text-blue-600 font-medium">
+                {leads.length} businesses active in "{searchLocation}"
+              </p>
+            </div>
+
+            {/* View Tabs */}
+            {leads.length > 0 && (
+              <div className="flex bg-gray-100 p-1 rounded-xl ml-4 shrink-0">
+                <button
+                  onClick={() => setActiveTab("pipeline")}
+                  className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeTab === "pipeline" 
+                      ? "bg-white text-[#111] shadow-sm" 
+                      : "text-gray-500 hover:text-[#111]"
+                  }`}
+                >
+                  LEADS TABLE
+                </button>
+                <button
+                  onClick={() => setActiveTab("videos")}
+                  className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeTab === "videos" 
+                      ? "bg-white text-[#111] shadow-sm" 
+                      : "text-gray-500 hover:text-[#111]"
+                  }`}
+                >
+                  ALL LEADS VIDEOS
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {leads.length === 0 && (
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/50 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+              >
+                <Upload size={14} />
+                IMPORT SCRAPED FILE
+              </button>
+            )}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`flex items-center gap-2 text-xs font-bold px-3 py-2.5 rounded-xl transition-all cursor-pointer border ${
+                showSettings 
+                  ? "bg-blue-55 text-blue-600 border-blue-200" 
+                  : "bg-white text-gray-650 border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <Settings size={14} className={showSettings ? "rotate-45 transition-transform" : ""} />
+              CRM SETTINGS
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {leads.length > 0 && leads.some(l => l.siteStatus !== "preview") && (
-            <button 
-              onClick={handleGenerateAllOutreach}
-              disabled={isBatchGenerating}
-              className="flex items-center gap-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-655 hover:from-blue-700 hover:to-indigo-750 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm mr-2"
-            >
-              <Sparkles size={14} className="animate-pulse" />
-              GENERATE ALL WEBSITES
-            </button>
-          )}
+        {/* Collapsible Settings Panel */}
+        {showSettings && (
+          <div className="p-5 bg-gray-50/70 border border-gray-200/50 rounded-2xl flex flex-col gap-4 animate-in slide-in-from-top-2 duration-150">
+            {/* Top row: API Key settings */}
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-705 whitespace-nowrap w-32">
+                <Lock size={14} className="text-blue-500" />
+                CRM API KEY:
+              </div>
+              <div className="flex-1 w-full flex items-center gap-2">
+                <input 
+                  type="password"
+                  placeholder="Enter custom CRM API Key (wacrm_live_...)"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="w-full max-w-xl px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                />
+                {apiKey && (
+                  <span className="text-[10px] font-bold text-emerald-600 whitespace-nowrap flex items-center gap-1">
+                    ✓ Configured
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-gray-400">
+                Saves locally in browser
+              </div>
+            </div>
 
-          {leads.length > 0 && (
-            <button 
-              onClick={handleBulkSendWhatsApp}
-              disabled={isBatchSendingWhatsApp}
-              className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm mr-2"
-            >
-              <Send size={14} />
-              {isBatchSendingWhatsApp ? "SENDING..." : "SEND WHATSAPP"}
-            </button>
-          )}
+            {/* Divider */}
+            <div className="h-px bg-gray-200/60 w-full"></div>
 
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/50 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-          >
-            <Upload size={14} />
-            IMPORT SCRAPED FILE
-          </button>
+            {/* Bottom row: Outreach template settings */}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={useTemplate} 
+                    onChange={(e) => setUseTemplate(e.target.checked)} 
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span>USE DYNAMIC OUTREACH TEMPLATE</span>
+                </label>
+                
+                {leads.length > 0 && (
+                  <button
+                    onClick={handleApplyTemplateToAll}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-750 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                    title="Overwrite outreach messages for all leads in the list with this template"
+                  >
+                    Apply Template to All Leads
+                  </button>
+                )}
+              </div>
 
-          {leads.length > 0 && (
-            <>
-              <div className="h-6 w-px bg-gray-200 mx-1"></div>
-              
-              <button 
-                onClick={handleExportXlsx}
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-                title="Export Excel (.xlsx)"
-              >
-                <FileSpreadsheet size={14} className="text-emerald-600" />
-                EXCEL
-              </button>
-
-              <button 
-                onClick={handleExportCsv}
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-                title="Export CSV (.csv)"
-              >
-                <Download size={14} className="text-blue-600" />
-                CSV
-              </button>
-
-              {leads.some(l => l.videoUrl && l.videoUrl.trim() !== "") && (
-                <button 
-                  onClick={handleDownloadAllVideos}
-                  className="flex items-center gap-1.5 text-xs font-bold text-purple-750 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-                  title="Download all generated outreach videos in one click"
-                >
-                  <Video size={14} className="text-purple-600" />
-                  DOWNLOAD ALL VIDEOS
-                </button>
+              {useTemplate && (
+                <div className="flex flex-col gap-2 mt-1 animate-in fade-in duration-150">
+                  <textarea 
+                    placeholder="Enter template message text... Use {name} for business name placeholder." 
+                    value={templateText} 
+                    onChange={(e) => setTemplateText(e.target.value)}
+                    className="w-full min-h-[90px] p-3 border border-gray-200 rounded-xl text-xs bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-gray-700 font-medium resize-y"
+                  />
+                  <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                    <span>💡 <strong>Tip:</strong> Use <code>{"{name}"}</code> or <code>{"(business name)"}</code> or <code>{"{{1}}"}</code> for the lead's name placeholder.</span>
+                  </div>
+                </div>
               )}
+            </div>
+          </div>
+        )}
 
-              <button 
-                onClick={handleClearAll}
-                className="flex items-center gap-1.5 text-xs font-semibold text-red-650 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-                title="Clear all leads"
-              >
-                <Trash2 size={14} />
-                CLEAR ALL
-              </button>
+        {/* 3 lines of buttons when leads are present */}
+        {leads.length > 0 && (
+          <div className="flex flex-col gap-3 pt-2 border-t border-gray-100">
+            {/* Row 1: Data operations */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-gray-405 uppercase tracking-wider w-24 shrink-0">1. Data:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 text-xs font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/50 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                >
+                  <Upload size={14} />
+                  IMPORT SCRAPED FILE
+                </button>
+                <button 
+                  onClick={handleExportXlsx}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-gray-770 bg-white hover:bg-gray-50 border border-gray-205 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                  title="Export Excel (.xlsx)"
+                >
+                  <FileSpreadsheet size={14} className="text-emerald-600" />
+                  EXCEL
+                </button>
+                <button 
+                  onClick={handleExportCsv}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-gray-770 bg-white hover:bg-gray-50 border border-gray-205 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                  title="Export CSV (.csv)"
+                >
+                  <Download size={14} className="text-blue-600" />
+                  CSV
+                </button>
+              </div>
+            </div>
 
-              <div className="h-6 w-px bg-gray-200 mx-1"></div>
+            {/* Row 2: Outreach / Automation */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-gray-405 uppercase tracking-wider w-24 shrink-0">2. Campaign:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                {leads.some(l => l.siteStatus !== "preview") && (
+                  <button 
+                    onClick={handleGenerateAllOutreach}
+                    disabled={isBatchGenerating}
+                    className="flex items-center gap-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-750 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                  >
+                    <Sparkles size={14} className="animate-pulse" />
+                    GENERATE ALL WEBSITES
+                  </button>
+                )}
+                <button 
+                  onClick={handleBulkSendWhatsApp}
+                  disabled={isBatchSendingWhatsApp}
+                  className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                >
+                  <Send size={14} />
+                  {isBatchSendingWhatsApp ? "SENDING..." : "SEND WHATSAPP"}
+                </button>
+                {leads.some(l => l.videoUrl && l.videoUrl.trim() !== "") && (
+                  <button 
+                    onClick={handleDownloadAllVideos}
+                    className="flex items-center gap-1.5 text-xs font-bold text-purple-750 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                    title="Download all generated outreach videos in one click"
+                  >
+                    <Video size={14} className="text-purple-600" />
+                    DOWNLOAD ALL VIDEOS
+                  </button>
+                )}
+              </div>
+            </div>
 
-              <button 
-                onClick={handleSaveToCRM}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/10"
-              >
-                <Save size={14} />
-                {isSaving ? "SAVING..." : "SAVE TO CRM"}
-              </button>
-            </>
-          )}
-        </div>
+            {/* Row 3: CRM System / Clean */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-gray-405 uppercase tracking-wider w-24 shrink-0">3. System:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button 
+                  onClick={handleSaveToCRM}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-blue-600/10"
+                >
+                  <Save size={14} />
+                  {isSaving ? "SAVING..." : "SAVE TO CRM"}
+                </button>
+                <button 
+                  onClick={handleClearAll}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-655 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                  title="Clear all leads"
+                >
+                  <Trash2 size={14} />
+                  CLEAR ALL
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto bg-gray-50/40">
@@ -970,6 +1176,83 @@ export function LeadPipeline() {
                 Search Maps Live
               </button>
             </div>
+          </div>
+        ) : activeTab === "videos" ? (
+          <div className="p-10 flex flex-col gap-6">
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Outreach Campaign Videos</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  View and manage all generated videos for your leads
+                </p>
+              </div>
+              <button
+                onClick={handleSaveToCRM}
+                disabled={isSaving}
+                className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-blue-600/10"
+              >
+                <Save size={14} />
+                EXPORT ALL VIDEOS TO CRM
+              </button>
+            </div>
+
+            {leads.filter(l => l.videoUrl && l.videoUrl.trim() !== "").length === 0 ? (
+              <div className="bg-white rounded-3xl border border-gray-150 p-12 text-center flex flex-col items-center justify-center shadow-sm">
+                <Video size={36} className="text-gray-400 mb-4" />
+                <h3 className="font-bold text-gray-900 text-sm">No Videos Generated Yet</h3>
+                <p className="text-xs text-gray-500 max-w-sm mt-1 mb-6">
+                  Please generate outreach campaigns in the Leads Table view first to produce recording videos.
+                </p>
+                <button
+                  onClick={() => setActiveTab("pipeline")}
+                  className="text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200 px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  Go to Leads Table
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {leads.filter(l => l.videoUrl && l.videoUrl.trim() !== "").map((lead) => (
+                  <div key={lead.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all">
+                    {/* Video Player */}
+                    <div className="relative aspect-video bg-black flex items-center justify-center">
+                      <video 
+                        src={lead.videoUrl} 
+                        controls 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    
+                    {/* Lead Info */}
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{lead.name}</h3>
+                        <p className="text-xs text-gray-505 mt-1">{lead.category || "No Category"}</p>
+                        {lead.phone && (
+                          <p className="text-xs text-gray-400 mt-2 font-mono">{lead.phone}</p>
+                        )}
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          Outreach Video
+                        </span>
+                        
+                        <button
+                          onClick={() => {
+                            setActiveOutreachLead(lead);
+                            setOutreachMessage(lead.outreachMessage || "");
+                          }}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                        >
+                          Send WhatsApp <Send size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm text-left border-collapse">
@@ -1210,7 +1493,7 @@ export function LeadPipeline() {
                       <div className="flex gap-2 mt-3">
                         <a 
                           href={generatedVideoUrl} 
-                          download={`outreach_${activeOutreachLead.id}.webm`}
+                          download={`outreach_${activeOutreachLead.id}.mp4`}
                           className="flex-1 text-[11px] font-bold text-gray-650 bg-gray-50 border border-gray-200/80 hover:bg-gray-100/80 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                         >
                           <Download size={13} className="text-blue-500" /> DOWNLOAD VIDEO
@@ -1237,32 +1520,24 @@ export function LeadPipeline() {
                         className="flex-1 min-h-[150px] p-3 text-xs font-semibold leading-relaxed border border-gray-200 rounded-2xl bg-gray-50/30 hover:bg-gray-50/55 focus:bg-white focus:border-blue-500 outline-none transition-all text-gray-800 font-medium shrink-0 resize-none shadow-inner"
                       />
                       
-                      {/* 100% Manual Dispatch Process */}
+                      {/* CRM API Dispatcher */}
                       <div className="flex flex-col gap-3 mt-4 bg-emerald-50/30 border border-emerald-100 p-4 rounded-2xl">
                         <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          Manual Outreach Guide (100% Safe)
+                          CRM WhatsApp Dispatcher
                         </span>
                         
-                        <div className="text-[11px] text-gray-650 font-semibold space-y-2.5 leading-relaxed">
-                          <p>Follow these steps to send with <strong>zero automation risk</strong>:</p>
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <span className="flex items-center justify-center w-4 h-4 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded-full shrink-0 mt-0.5">1</span>
-                              <span>Click <strong>DOWNLOAD VIDEO</strong> on the left to save the walkthrough.</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className="flex items-center justify-center w-4 h-4 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded-full shrink-0 mt-0.5">2</span>
-                              <span>Click the <strong>COPY MESSAGE</strong> button below to copy the pitch.</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className="flex items-center justify-center w-4 h-4 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded-full shrink-0 mt-0.5">3</span>
-                              <span>Click <strong>Open WhatsApp Chat</strong>, paste your pitch, attach/drag the video, and send!</span>
-                            </div>
-                          </div>
-                        </div>
+                        <div className="flex flex-col gap-2 mt-1">
+                          <button
+                            type="button"
+                            onClick={handleSendSingleWhatsApp}
+                            disabled={isSendingSingleWhatsApp}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-emerald-600/10 text-xs uppercase tracking-wider w-full"
+                          >
+                            <Send size={14} className={isSendingSingleWhatsApp ? "animate-spin" : ""} />
+                            {isSendingSingleWhatsApp ? "SENDING..." : "Send via WhatsApp API"}
+                          </button>
 
-                        <div className="flex flex-col gap-2 mt-2">
                           <button
                             type="button"
                             onClick={handleCopyMessage}
@@ -1270,28 +1545,6 @@ export function LeadPipeline() {
                           >
                             {copied ? "✓ Pitch Copied!" : "Copy Pitch Message"}
                           </button>
-                          
-                          <a
-                            href={`https://api.whatsapp.com/send?phone=${(() => {
-                              let clean = activeOutreachLead.phone ? activeOutreachLead.phone.replace(/[^0-9]/g, '') : "";
-                              if (clean.startsWith("0") && clean.length === 11) {
-                                clean = "91" + clean.substring(1);
-                              } else if (clean.length === 10) {
-                                clean = "91" + clean;
-                              }
-                              return clean;
-                            })()}&text=${encodeURIComponent(outreachMessage)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-emerald-600/10 text-xs uppercase tracking-wider w-full"
-                            onClick={() => {
-                              // Mark lead as contacted manually
-                              setLeads(prev => prev.map(l => l.id === activeOutreachLead.id ? { ...l, whatsappStatus: 'sent' } : l));
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.45L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.449 5.4 0 9.794-4.391 9.797-9.793.001-2.618-1.01-5.08-2.848-6.92C16.38 2.05 13.91 1.039 12.01 1.04 6.548 1.04 2.161 5.429 2.158 10.893c-.002 1.52.41 3.004 1.196 4.329l-.99 3.613 3.693-.977zm11.722-6.84c-.302-.15-1.786-.882-2.07-.985-.285-.104-.492-.154-.7.155-.207.308-.8.985-.98 1.19-.18.207-.363.233-.665.082-2.096-1.048-3.26-1.8-4.57-4.068-.145-.25-.037-.432.079-.58.105-.133.303-.363.394-.483.09-.12.15-.224.225-.379.075-.155.038-.293-.019-.397-.057-.104-.492-1.19-.675-1.63-.178-.432-.375-.373-.518-.373-.135-.002-.29-.002-.445-.002-.156 0-.41.058-.624.285-.213.227-.816.797-.816 1.944 0 1.147.833 2.254.95 2.409.116.156 1.637 2.5 3.966 3.51.554.24 1.002.38 1.344.49.557.177 1.064.152 1.465.092.447-.067 1.48-.605 1.688-1.19.208-.585.208-1.086.146-1.19-.063-.105-.244-.156-.546-.307z"/></svg>
-                            Open WhatsApp Chat
-                          </a>
                         </div>
                       </div>
                     </div>

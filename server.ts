@@ -1409,10 +1409,28 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
       const finalWebmPath = path.join(videosDir, `${sanitizedId}.webm`);
       await safeMoveVideo(rawVideoPath, finalWebmPath);
 
-      const cleanPhone = phone ? String(phone).replace(/[^0-9+]/g, "") : "";
+      // Convert to mp4 for WhatsApp compatibility using ffmpeg
+      const finalMp4Path = path.join(videosDir, `${sanitizedId}.mp4`);
+      console.log(`[Outreach Factory] Converting webm to mp4 for WhatsApp compatibility using ffmpeg...`);
+      try {
+        const ffmpegPath = require("ffmpeg-static");
+        const { execSync } = require("child_process");
+        execSync(`"${ffmpegPath}" -y -i "${finalWebmPath}" -c:v libx264 -profile:v high -level:v 4.0 -pix_fmt yuv420p -c:a aac -b:a 128k "${finalMp4Path}"`);
+        console.log(`[Outreach Factory] ffmpeg conversion successful: ${finalMp4Path}`);
+      } catch (ffmpegErr: any) {
+        console.error(`[Outreach Factory] ffmpeg conversion failed:`, ffmpegErr.message || ffmpegErr);
+      }
+
+      const digitsOnly = phone ? String(phone).replace(/[^0-9]/g, "") : "";
       let isIndia = false;
-      if (cleanPhone) {
-        if (cleanPhone.startsWith("+91") || (cleanPhone.startsWith("91") && cleanPhone.length === 12) || cleanPhone.length === 10) {
+      if (digitsOnly) {
+        let tempPhone = digitsOnly;
+        if (tempPhone.startsWith("0091")) tempPhone = tempPhone.substring(2);
+        if (tempPhone.startsWith("910") && tempPhone.length === 13) tempPhone = "91" + tempPhone.substring(3);
+        if (tempPhone.startsWith("0") && tempPhone.length === 11) tempPhone = tempPhone.substring(1);
+        if (tempPhone.length === 10) tempPhone = "91" + tempPhone;
+        
+        if (tempPhone.startsWith("91") && tempPhone.length === 12) {
           isIndia = true;
         }
       }
@@ -1486,7 +1504,7 @@ Instructions:
 
       res.json({
         success: true,
-        videoUrl: `/videos/${sanitizedId}.webm`,
+        videoUrl: `/videos/${sanitizedId}.mp4`,
         websiteUrl: `/templates/${templateType}?name=${encodeURIComponent(name)}&category=${encodeURIComponent(category || "")}&phone=${encodeURIComponent(phone || "")}`,
         message: messageText
       });
@@ -1531,7 +1549,8 @@ Instructions:
           const filePath = path.join(process.cwd(), "public", relativePath);
           if (fs.existsSync(filePath)) {
             const cleanName = v.name ? v.name.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase() : "video";
-            zip.addLocalFile(filePath, undefined, `${cleanName}.webm`);
+            const ext = path.extname(filePath) || ".mp4";
+            zip.addLocalFile(filePath, undefined, `${cleanName}${ext}`);
             addedAny = true;
           }
         }
@@ -1552,7 +1571,7 @@ Instructions:
   });
 
   app.post("/api/whatsapp/send", async (req, res) => {
-    const { phone, message, videoUrl, apiKey, apiUrl, skipDuplicateCheck, autoSend } = req.body;
+    const { phone, message, videoUrl, apiKey, apiUrl, name } = req.body;
     if (!phone || !message) {
       return res.status(400).json({ error: "Phone number and message are required" });
     }
@@ -1562,6 +1581,20 @@ Instructions:
       if (!result.success) {
         return res.status(500).json({ error: result.error || "Failed to send WhatsApp message" });
       }
+
+      // If Supabase CRM is configured, sync contact name and log message to database
+      if (isSupabaseConfigured) {
+        try {
+          const contactId = await syncLeadToSupabase({ name: name || phone, phone, videoUrl });
+          if (contactId) {
+            const { userId, accountId } = await resolveActiveUserAndAccount();
+            await logMessageToCRM(contactId, userId, accountId, message, videoUrl);
+          }
+        } catch (dbErr) {
+          console.error("[Supabase CRM Sync & Log Error]", dbErr);
+        }
+      }
+
       res.json({ success: true, messageId: result.messageId });
     } catch (error: any) {
       console.error("[WhatsApp Send Error]", error);
