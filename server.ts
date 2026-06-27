@@ -1412,13 +1412,33 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
       // Convert to mp4 for WhatsApp compatibility using ffmpeg
       const finalMp4Path = path.join(videosDir, `${sanitizedId}.mp4`);
       console.log(`[Outreach Factory] Converting webm to mp4 for WhatsApp compatibility using ffmpeg...`);
+      
+      let ffmpegSuccessful = false;
+      const { execSync } = require("child_process");
+
+      // 1. Try with ffmpeg-static
       try {
-        const ffmpegPath = require("ffmpeg-static");
-        const { execSync } = require("child_process");
-        execSync(`"${ffmpegPath}" -y -i "${finalWebmPath}" -c:v libx264 -profile:v high -level:v 4.0 -pix_fmt yuv420p -c:a aac -b:a 128k "${finalMp4Path}"`);
-        console.log(`[Outreach Factory] ffmpeg conversion successful: ${finalMp4Path}`);
-      } catch (ffmpegErr: any) {
-        console.error(`[Outreach Factory] ffmpeg conversion failed:`, ffmpegErr.message || ffmpegErr);
+        const ffmpegStatic = require("ffmpeg-static");
+        if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+          console.log(`[Outreach Factory] Trying ffmpeg-static at ${ffmpegStatic}...`);
+          execSync(`"${ffmpegStatic}" -y -i "${finalWebmPath}" -c:v libx264 -profile:v high -level:v 4.0 -pix_fmt yuv420p -c:a aac -b:a 128k "${finalMp4Path}"`);
+          console.log(`[Outreach Factory] ffmpeg-static conversion successful: ${finalMp4Path}`);
+          ffmpegSuccessful = true;
+        }
+      } catch (err: any) {
+        console.warn(`[Outreach Factory] ffmpeg-static failed (permissions or format error):`, err.message || err);
+      }
+
+      // 2. Fallback to global ffmpeg
+      if (!ffmpegSuccessful) {
+        try {
+          console.log(`[Outreach Factory] Falling back to global system ffmpeg...`);
+          execSync(`ffmpeg -y -i "${finalWebmPath}" -c:v libx264 -profile:v high -level:v 4.0 -pix_fmt yuv420p -c:a aac -b:a 128k "${finalMp4Path}"`);
+          console.log(`[Outreach Factory] Global system ffmpeg conversion successful: ${finalMp4Path}`);
+          ffmpegSuccessful = true;
+        } catch (globalErr: any) {
+          console.error(`[Outreach Factory] Global ffmpeg conversion also failed. No mp4 generated:`, globalErr.message || globalErr);
+        }
       }
 
       const digitsOnly = phone ? String(phone).replace(/[^0-9]/g, "") : "";
