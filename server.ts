@@ -1414,12 +1414,14 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
       console.log(`[Outreach Factory] Converting webm to mp4 for WhatsApp compatibility using ffmpeg...`);
       
       let ffmpegSuccessful = false;
-      const { execSync } = require("child_process");
+      const child_process = await import("child_process");
+      const { execSync } = child_process;
 
       // 1. Try with ffmpeg-static
       try {
-        const ffmpegStatic = require("ffmpeg-static");
-        if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+        const ffmpegStaticMod = await import("ffmpeg-static");
+        const ffmpegStatic = ffmpegStaticMod.default || ffmpegStaticMod;
+        if (ffmpegStatic && fs.existsSync(ffmpegStatic as string)) {
           console.log(`[Outreach Factory] Trying ffmpeg-static at ${ffmpegStatic}...`);
           execSync(`"${ffmpegStatic}" -y -i "${finalWebmPath}" -c:v libx264 -profile:v high -level:v 4.0 -pix_fmt yuv420p -c:a aac -b:a 128k "${finalMp4Path}"`);
           console.log(`[Outreach Factory] ffmpeg-static conversion successful: ${finalMp4Path}`);
