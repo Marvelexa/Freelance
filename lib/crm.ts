@@ -13,6 +13,7 @@ export interface CRMMessageResult {
  */
 export async function sendWhatsAppViaCRM(
   phone: string,
+  name: string | undefined | null,
   message: string,
   mediaUrl?: string,
   customApiKey?: string,
@@ -63,9 +64,14 @@ export async function sendWhatsAppViaCRM(
 
     const payload = isVideo ? {
       phone: cleanPhone,
-      message_type: "video",
-      media_url: absoluteMediaUrl,
-      content_text: message // Caption for the video
+      message_type: "template",
+      template_name: "website_outreach_soft",
+      template_language: "en",
+      template_message_params: {
+        body: [name || "there"], // Pass the customer's name dynamically to the template
+        headerMediaUrl: absoluteMediaUrl
+      },
+      content_text: message // Keep message for fallback logging
     } : {
       phone: cleanPhone,
       message_type: "text",

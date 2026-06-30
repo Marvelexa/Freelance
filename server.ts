@@ -1599,7 +1599,7 @@ Instructions:
     }
     try {
       const { sendWhatsAppViaCRM } = await import("./lib/crm");
-      const result = await sendWhatsAppViaCRM(phone, message, videoUrl, apiKey, apiUrl);
+      const result = await sendWhatsAppViaCRM(phone, name, message, videoUrl, apiKey, apiUrl);
       if (!result.success) {
         return res.status(500).json({ error: result.error || "Failed to send WhatsApp message" });
       }
