@@ -887,7 +887,7 @@ async function startServer() {
       } else if (hasHiringIntent) {
         query = `${cleanKeyword} is:issue state:open created:>=${dateString}`;
       } else {
-        query = `"${cleanKeyword}" ("looking for" OR "hiring" OR "need" OR "freelance" OR "job" OR "developer" OR "website") is:issue state:open created:>=${dateString}`;
+        query = `"${cleanKeyword}" ("looking for" OR "hiring" OR "need" OR "freelance" OR "developer") is:issue state:open created:>=${dateString}`;
       }
 
       const searchUrl = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=created&order=desc&per_page=${limit}`;
