@@ -18,6 +18,38 @@ export function LeadDiscovery() {
   const [leads, setLeads] = useState<any[]>([]);
   const [isTestingToken, setIsTestingToken] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [searchedNiche, setSearchedNiche] = useState("");
+
+  const highlightText = (text: string, searchPhrase: string) => {
+    if (!text || !searchPhrase) return text;
+    
+    const words = searchPhrase
+      .toLowerCase()
+      .replace(/["']/g, "")
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !["for", "the", "and", "with", "this", "need", "that", "looking", "hiring", "developer", "website", "freelance", "state:open", "is:issue"].includes(word));
+      
+    if (words.length === 0) return text;
+    
+    const sortedWords = [...words].sort((a, b) => b.length - a.length);
+    const pattern = sortedWords.map(w => w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+    const regex = new RegExp(`(${pattern})`, 'gi');
+    
+    const parts = text.split(regex);
+    return (
+      <>
+        {parts.map((part, i) => 
+          regex.test(part) ? (
+            <mark key={i} className="bg-yellow-500/25 text-amber-700 dark:text-amber-200 px-0.5 rounded font-semibold border border-yellow-500/10">
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  };
 
   const checkGithubConnection = async () => {
     setIsTestingToken(true);
@@ -64,6 +96,7 @@ export function LeadDiscovery() {
     if (searchSource === "github" && !niche) return;
     
     setIsSearching(true);
+    setSearchedNiche(niche);
     
     try {
       if (searchSource === "maps") {
@@ -280,10 +313,10 @@ export function LeadDiscovery() {
                               {searchSource === "github" ? (
                                 <>
                                   <Github className="w-4 h-4 text-muted-foreground" />
-                                  <span>{lead.title}</span>
+                                  <span>{highlightText(lead.title, searchedNiche)}</span>
                                 </>
                               ) : (
-                                <span>{lead.name}</span>
+                                <span>{highlightText(lead.name, searchedNiche)}</span>
                               )}
                               {searchSource === "maps" && !lead.website && <Badge variant="destructive" className="py-0 h-5">No Website</Badge>}
                               {searchSource === "github" && lead.email !== "No public email" && (
@@ -312,7 +345,7 @@ export function LeadDiscovery() {
                          
                          {searchSource === "github" && lead.description && (
                            <p className="text-xs text-muted-foreground bg-secondary/35 p-3 rounded-lg border border-border/40 mt-3 font-sans line-clamp-3 leading-relaxed">
-                             {lead.description}
+                             {highlightText(lead.description, searchedNiche)}
                            </p>
                          )}
                          
