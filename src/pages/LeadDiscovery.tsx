@@ -16,6 +16,40 @@ export function LeadDiscovery() {
   const [showTokenSettings, setShowTokenSettings] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
+  const [isTestingToken, setIsTestingToken] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  const checkGithubConnection = async () => {
+    setIsTestingToken(true);
+    setConnectionStatus(null);
+    try {
+      const response = await fetch('/api/leads/discover/github/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: githubToken })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setConnectionStatus({
+          success: true,
+          message: `✅ Connected as @${data.username} (API rate limit: ${data.rateLimitRemaining}/${data.rateLimitLimit})`
+        });
+      } else {
+        setConnectionStatus({
+          success: false,
+          message: `❌ ${data.error || "Connection failed. Please check token."}`
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setConnectionStatus({
+        success: false,
+        message: "❌ Error connecting to test server."
+      });
+    } finally {
+      setIsTestingToken(false);
+    }
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,13 +181,33 @@ export function LeadDiscovery() {
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Adding your token prevents API rate-limiting (403 errors) and allows the engine to pull richer user profile data such as public email addresses.
               </p>
-              <Input
-                type="password"
-                placeholder="github_pat_..."
-                value={githubToken}
-                onChange={e => setGithubToken(e.target.value)}
-                className="bg-card text-xs"
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder="github_pat_... (Leave blank to use pre-saved token)"
+                  value={githubToken}
+                  onChange={e => setGithubToken(e.target.value)}
+                  className="bg-card text-xs flex-1"
+                />
+                <Button 
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isTestingToken}
+                  onClick={checkGithubConnection}
+                  className="shrink-0 h-9"
+                >
+                  {isTestingToken ? "Testing..." : "Test Connection"}
+                </Button>
+              </div>
+              {connectionStatus && (
+                <p className={cn(
+                  "text-[11px] font-medium leading-normal",
+                  connectionStatus.success ? "text-emerald-500" : "text-destructive"
+                )}>
+                  {connectionStatus.message}
+                </p>
+              )}
             </div>
           )}
 

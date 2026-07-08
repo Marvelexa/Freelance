@@ -968,6 +968,41 @@ async function startServer() {
     }
   });
 
+  app.post("/api/leads/discover/github/test", async (req, res) => {
+    try {
+      const { token } = req.body;
+      const resolvedToken = (token && token.trim()) || process.env.GITHUB_TOKEN;
+      if (!resolvedToken || !resolvedToken.trim()) {
+        return res.json({ success: false, error: "No token provided and GITHUB_TOKEN environment variable is not configured." });
+      }
+
+      const headers: Record<string, string> = {
+        'User-Agent': 'Freelance-Goldmine-Token-Tester',
+        'Accept': 'application/vnd.github.v3+json',
+        'Authorization': `token ${resolvedToken.trim()}`
+      };
+
+      const response = await fetch('https://api.github.com/user', { headers });
+      if (!response.ok) {
+        return res.json({ success: false, error: `GitHub API returned error: ${response.status} ${response.statusText}` });
+      }
+
+      const userData = await response.json();
+      const rateLimitLimit = response.headers.get('x-ratelimit-limit') || '5000';
+      const rateLimitRemaining = response.headers.get('x-ratelimit-remaining') || '4999';
+
+      res.json({
+        success: true,
+        username: userData.login,
+        rateLimitLimit,
+        rateLimitRemaining
+      });
+    } catch (err) {
+      console.error("[GitHub Token Test] Error:", err);
+      res.json({ success: false, error: String(err) });
+    }
+  });
+
   app.post("/api/website/generate", async (req, res) => {
     // Generate website structure using Gemini
     try {
