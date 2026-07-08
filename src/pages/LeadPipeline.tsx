@@ -16,6 +16,7 @@ import {
   Database,
   FileSpreadsheet,
   Trash2,
+  CheckCircle,
   Send,
   Settings,
   Lock
@@ -41,6 +42,17 @@ const calculateFrontendScore = (lead: any) => {
     score += 15; // High volume (paying customers)
   }
   return Math.min(100, score);
+};
+
+const getArchivedLeads = () => {
+  try {
+    return JSON.parse(localStorage.getItem('crm_archived_leads') || '[]');
+  } catch(e) { return []; }
+};
+
+const isLeadArchived = (lead: any) => {
+  const ids = getArchivedLeads();
+  return ids.includes(lead.mapsUrl) || ids.includes(lead.phone) || ids.includes(lead.name);
 };
 
 export function LeadPipeline() {
@@ -179,6 +191,7 @@ export function LeadPipeline() {
             const existingMap = new Map(prev.map(l => [l.mapsUrl || l.name, l]));
             const merged = [...prev];
             data.leads.forEach((lead: any) => {
+              if (isLeadArchived(lead)) return;
               const key = lead.mapsUrl || lead.name;
               if (existingMap.has(key)) {
                 const idx = merged.findIndex(l => (l.mapsUrl && l.mapsUrl === lead.mapsUrl) || l.name === lead.name);
@@ -222,6 +235,51 @@ export function LeadPipeline() {
     }
   };
 
+  const handleArchiveLead = async (id: string | number) => {
+    if (confirm("Mark this lead as Completed? It will be archived and hidden from future searches.")) {
+      const lead = leads.find(l => l.id === id);
+      if (lead) {
+        const archived = getArchivedLeads();
+        const key = lead.mapsUrl || lead.phone || lead.name;
+        if (key && !archived.includes(key)) {
+          archived.push(key);
+          localStorage.setItem('crm_archived_leads', JSON.stringify(archived));
+        }
+        setLeads((prev) => prev.filter((l) => l.id !== id));
+        try {
+          await fetch("/api/leads/sync/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+        } catch (e) {}
+      }
+    }
+  };
+
+  const handleArchiveCompleted = async () => {
+    const completedLeads = leads.filter(l => l.siteStatus === "preview");
+    if (completedLeads.length === 0) {
+      alert("No completed leads (with generated websites) found to archive.");
+      return;
+    }
+    if (confirm(`Archive ${completedLeads.length} completed leads? They will be hidden from future searches.`)) {
+      const archived = getArchivedLeads();
+      completedLeads.forEach(lead => {
+        const key = lead.mapsUrl || lead.phone || lead.name;
+        if (key && !archived.includes(key)) {
+          archived.push(key);
+        }
+      });
+      localStorage.setItem('crm_archived_leads', JSON.stringify(archived));
+      
+      const completedIds = completedLeads.map(l => l.id);
+      setLeads(prev => prev.filter(l => !completedIds.includes(l.id)));
+      
+      try {
+        for (const id of completedIds) {
+          await fetch("/api/leads/sync/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+        }
+      } catch (e) {}
+    }
+  };
+
   const handleRemoveLead = async (id: string | number) => {
     if (confirm("Are you sure you want to remove this lead?")) {
       setLeads((prev) => prev.filter((l) => l.id !== id));
@@ -239,7 +297,7 @@ export function LeadPipeline() {
 
   // Normalizes rows exported from C:\Users\Prince\OneDrive\Desktop\website demos\Googlemap_scraper
   const processImportedRows = (rows: any[]) => {
-    return rows.map((row: any, index: number) => {
+    const parsed = rows.map((row: any, index: number) => {
       const name = row.Name || row.name || row["Business Name"] || "";
       const category = row.Category || row.category || "";
       
@@ -284,6 +342,25 @@ export function LeadPipeline() {
       
       return lead;
     });
+
+    // Un-archive these leads since the user explicitly imported them
+    const archived = getArchivedLeads();
+    let archiveModified = false;
+    
+    parsed.forEach((lead: any) => {
+      const key = lead.mapsUrl || lead.phone || lead.name;
+      const idx = archived.indexOf(key);
+      if (idx !== -1) {
+        archived.splice(idx, 1);
+        archiveModified = true;
+      }
+    });
+
+    if (archiveModified) {
+      localStorage.setItem('crm_archived_leads', JSON.stringify(archived));
+    }
+
+    return parsed;
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1136,6 +1213,14 @@ export function LeadPipeline() {
                   {isSaving ? "SAVING..." : "SAVE TO CRM"}
                 </button>
                 <button 
+                  onClick={handleArchiveCompleted}
+                  className="flex items-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                  title="Archive all leads that have generated websites"
+                >
+                  <CheckCircle size={14} />
+                  ARCHIVE COMPLETED
+                </button>
+                <button 
                   onClick={handleClearAll}
                   className="flex items-center gap-1.5 text-xs font-semibold text-red-655 bg-red-50 hover:bg-red-100 border border-red-200 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
                   title="Clear all leads"
@@ -1370,6 +1455,13 @@ export function LeadPipeline() {
                     )}
                     <button className="text-gray-400 hover:text-blue-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100" title="View details">
                       <Eye size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleArchiveLead(lead.id)}
+                      className="text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors p-1.5 rounded-lg cursor-pointer" 
+                      title="Mark as Done & Archive"
+                    >
+                      <CheckCircle size={16} />
                     </button>
                     <button 
                       id={`btn-remove-lead-${lead.id}`}

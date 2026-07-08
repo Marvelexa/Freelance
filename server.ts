@@ -865,6 +865,108 @@ async function startServer() {
     }
   });
 
+  app.post("/api/leads/discover/github", async (req, res) => {
+    try {
+      const { keyword, token, limit = 15 } = req.body;
+      if (!keyword) {
+        return res.status(400).json({ error: "Keyword is required" });
+      }
+
+      // Build GitHub search query
+      const query = keyword.includes("is:") ? keyword : `"${keyword}" is:issue state:open`;
+      const searchUrl = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=created&order=desc&per_page=${limit}`;
+
+      const headers: Record<string, string> = {
+        'User-Agent': 'Freelance-Goldmine-Lead-Finder',
+        'Accept': 'application/vnd.github.v3+json',
+      };
+      if (token && token.trim()) {
+        headers['Authorization'] = `token ${token.trim()}`;
+      }
+
+      console.log(`[GitHub Discovery] Fetching query: "${query}"`);
+      const response = await fetch(searchUrl, { headers });
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({ error: `GitHub API error: ${errorText || response.statusText}` });
+      }
+
+      const searchData = await response.json();
+      const items = searchData.items || [];
+
+      // Extract details in parallel
+      const leads = await Promise.all(items.map(async (item: any) => {
+        // Regex email extraction from body
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        const bodyText = item.body || "";
+        const titleText = item.title || "";
+        const combinedText = `${titleText} \n ${bodyText}`;
+        const foundEmails = combinedText.match(emailRegex);
+        let email = foundEmails ? foundEmails[0] : null;
+
+        // Extract potential website/references from body
+        const urlRegex = /https?:\/\/[^\s$.?#].[^\s]*/gi;
+        const foundUrls = bodyText.match(urlRegex);
+        let website = "";
+        if (foundUrls) {
+          const externalUrl = foundUrls.find((u: string) => !u.includes("github.com") && !u.includes("githubusercontent.com"));
+          if (externalUrl) {
+            website = externalUrl.replace(/^[a-zA-Z]+:\/\//, ""); // remove protocol
+          }
+        }
+
+        let repoStars = 0;
+        let userEmail = null;
+        let userRealName = null;
+
+        // Fetch additional info if possible
+        try {
+          if (item.repository_url) {
+            const repoRes = await fetch(item.repository_url, { headers });
+            if (repoRes.ok) {
+              const repoData = await repoRes.json();
+              repoStars = repoData.stargazers_count || 0;
+            }
+          }
+          
+          if (item.user && item.user.url && !email) {
+            const userRes = await fetch(item.user.url, { headers });
+            if (userRes.ok) {
+              const userData = await userRes.json();
+              userEmail = userData.email;
+              userRealName = userData.name;
+            }
+          }
+        } catch (e) {
+          // Fail silently on extra fetches
+        }
+
+        const finalEmail = email || userEmail || "No public email";
+        const finalName = userRealName ? `${userRealName} (${item.user.login})` : item.user.login;
+        const repoName = item.repository_url.split('/repos/')[1] || "GitHub";
+
+        return {
+          id: String(item.id),
+          name: `${finalName} | Repo: ${repoName}`,
+          title: item.title,
+          rating: repoStars > 0 ? `⭐ ${repoStars}` : "GitHub Issue",
+          address: item.html_url,
+          website: website || item.user.html_url,
+          phone: "GitHub Gigs",
+          email: finalEmail,
+          niche: keyword,
+          reviewsCount: item.comments || 0,
+          description: bodyText.substring(0, 500) + (bodyText.length > 500 ? "..." : "")
+        };
+      }));
+
+      res.json({ status: "SUCCESS", results: leads });
+    } catch (err) {
+      console.error("[GitHub Lead Discovery] Error:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.post("/api/website/generate", async (req, res) => {
     // Generate website structure using Gemini
     try {
@@ -1489,44 +1591,46 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
         }
       }
 
-      // 3. Craft Personalized Sales Pitch with Gemini
-      const pitchPrompt = `
-Write a highly personalized, warm sales outreach message for a business named "${name}" in the category "${category}".
-Reference Google Maps stats: ${rating || 4.2} star rating with ${reviewsCount || 20} reviews.
-The style must match this template:
-"Hi! I made this sample website for [Business Name] — saw your awesome reviews about [specific details about products/services/customer experience, e.g. ethnic wear with reasonable prices and very loving, friendly staff]. Your [business type, e.g. clothing store] deserves to show up properly online. While many agencies charge more, if you like it, I can customize this and ${pitchTemplateSuffix}"
+      // 3. Craft Personalized Sales Pitch (AI Disabled to save time/tokens)
+      // We use their exact Meta template text so it shows up correctly in the CRM UI fallback.
+      let messageText = `Hello! I made a personalized video and sample website design for ${name} — saw your amazing reviews about your beautiful collection of ethnic wear and the extremely friendly, attentive staff. Your clothing store has such a great reputation, and it truly deserves to show up properly online with a premium web presence. I recorded a quick video walkthrough showing how we can transform your digital storefront, get it live in just 1 week, and integrate complete premium features to attract more customers. I have attached the video here.`;
 
-Instructions:
-1. Replace "[Business Name]" with "${name}".
-2. Replace "[specific details about products/services/customer experience]" with a short, highly customized description of their positive reviews or niche (e.g. "delicious coffee and cozy seating", "beautiful bridal styling and helpful staff").
-3. Replace "[business type]" with a category noun (e.g., "restaurant", "clothing store", "cafe", "clinic", "salon").
-4. Keep the exact text: "deserves to show up properly online. While many agencies charge more, if you like it, I can customize this and ${pitchTemplateSuffix}"
-5. Only return the final raw text of the message. Do not include markdown, double quotes around the whole text, or explanations.
-`;
-
-      const pitchResponse = await generateContentWithFallback(
-        pitchPrompt,
-        undefined,
-        "opencode",
-        process.env.OPENCODE_MODEL_NAME || "deepseek-v4-flash-free"
-      );
-
-      let messageText = (pitchResponse.text || "").trim().replace(/^"|"+$/g, ""); // clean wrapping quotes
-
-      // Post-processing safety: Ensure the exact required pricing suffix and agency comparison is used
-      const triggerPhrase = "While many agencies charge more, if you like it, I can customize this and";
-      const triggerIndex = messageText.indexOf(triggerPhrase);
-      if (triggerIndex !== -1) {
-        messageText = messageText.substring(0, triggerIndex + triggerPhrase.length) + " " + pitchTemplateSuffix;
-      } else {
-        // Fallback if the trigger phrase is missing in Gemini output
-        const bizNoun = templateType === "ecommerce" ? "clothing store" : templateType === "restaurant" ? "restaurant" : "cafe";
-        messageText = `Hi! I made this sample website for ${name} — saw your awesome reviews. Your ${bizNoun} deserves to show up properly online. While many agencies charge more, if you like it, I can customize this and ${pitchTemplateSuffix}`;
+      let finalVideoUrl = `/videos/${sanitizedId}.mp4`;
+      
+      // Attempt to upload to Supabase storage to get a public URL for WhatsApp
+      if (ffmpegSuccessful && isSupabaseConfigured) {
+        try {
+          const fsModule = await import("fs");
+          const fileBuffer = fsModule.readFileSync(finalMp4Path);
+          const fileName = `outreach-${sanitizedId}-${Date.now()}.mp4`;
+          const uploadUrl = `${SUPABASE_URL}/storage/v1/object/chat-media/${fileName}`;
+          
+          console.log(`[Outreach Factory] Uploading video to Supabase Storage at ${uploadUrl}...`);
+          
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'video/mp4'
+            },
+            body: fileBuffer
+          });
+          
+          if (uploadRes.ok) {
+            finalVideoUrl = `${SUPABASE_URL}/storage/v1/object/public/chat-media/${fileName}`;
+            console.log(`[Outreach Factory] Successfully uploaded video to Supabase. Public URL: ${finalVideoUrl}`);
+          } else {
+            const errData = await uploadRes.json().catch(() => ({}));
+            console.error(`[Outreach Factory] Failed to upload to Supabase:`, uploadRes.status, errData);
+          }
+        } catch (uploadErr) {
+          console.error(`[Outreach Factory] Error uploading to Supabase:`, uploadErr);
+        }
       }
 
       res.json({
         success: true,
-        videoUrl: `/videos/${sanitizedId}.mp4`,
+        videoUrl: finalVideoUrl,
         websiteUrl: `/templates/${templateType}?name=${encodeURIComponent(name)}&category=${encodeURIComponent(category || "")}&phone=${encodeURIComponent(phone || "")}`,
         message: messageText
       });
@@ -1609,11 +1713,14 @@ Instructions:
         try {
           const contactId = await syncLeadToSupabase({ name: name || phone, phone, videoUrl });
           if (contactId) {
+            // We NO LONGER call logMessageToCRM here because the CRM API (/api/v1/messages) 
+            // automatically inserts the message record into Supabase upon successful send!
+            // Calling it here causes duplicate (and incorrectly typed 'text') messages in the UI.
             const { userId, accountId } = await resolveActiveUserAndAccount();
-            await logMessageToCRM(contactId, userId, accountId, message, videoUrl);
+            // await logMessageToCRM(contactId, userId, accountId, message, videoUrl);
           }
         } catch (dbErr) {
-          console.error("[Supabase CRM Sync & Log Error]", dbErr);
+          console.error("[Supabase CRM Sync Error]", dbErr);
         }
       }
 

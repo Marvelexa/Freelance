@@ -28,7 +28,7 @@ export async function sendWhatsAppViaCRM(
   }
 
   // Format the phone number (E.164 format)
-  let cleanPhone = phone.replace(/[^0-9]/g, "");
+  let cleanPhone = String(phone).replace(/[^0-9]/g, "");
   
   // Strip international dialing double zero prefix if it starts with 0091
   if (cleanPhone.startsWith("0091")) {
@@ -55,12 +55,53 @@ export async function sendWhatsAppViaCRM(
     // Prepare endpoint and payload
     const endpoint = `${apiUrl}/messages`;
     
-    // If mediaUrl is relative (e.g. /videos/abc.webm), prefix it with our app's public URL
+    // If mediaUrl is relative (e.g. /videos/abc.mp4), upload it to Supabase so it has a public URL for Meta
     let absoluteMediaUrl = mediaUrl;
     if (mediaUrl && (mediaUrl.startsWith("/") || !mediaUrl.startsWith("http"))) {
-      const appUrl = process.env.APP_URL || "http://localhost:3000"; // outreach project port
-      absoluteMediaUrl = `${appUrl.replace(/\/$/, "")}/${mediaUrl.replace(/^\//, "")}`;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        try {
+          const fs = await import("fs");
+          const path = await import("path");
+          const filePath = path.join(process.cwd(), "public", mediaUrl.replace(/^\//, ""));
+          if (fs.existsSync(filePath)) {
+            const fileBuffer = fs.readFileSync(filePath);
+            const fileName = `outreach-legacy-${Date.now()}.mp4`;
+            const uploadUrl = `${supabaseUrl}/storage/v1/object/chat-media/${fileName}`;
+            
+            console.log(`[CRM API] Uploading legacy local video to Supabase Storage at ${uploadUrl}...`);
+            const uploadRes = await fetch(uploadUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'video/mp4'
+              },
+              body: fileBuffer
+            });
+            
+            if (uploadRes.ok) {
+              absoluteMediaUrl = `${supabaseUrl}/storage/v1/object/public/chat-media/${fileName}`;
+              console.log(`[CRM API] Successfully uploaded. New public URL: ${absoluteMediaUrl}`);
+            } else {
+              console.error(`[CRM API] Failed to upload legacy video to Supabase:`, uploadRes.status);
+            }
+          }
+        } catch (e) {
+          console.error(`[CRM API] Error uploading legacy video:`, e);
+        }
+      }
+      
+      // Fallback if Supabase upload failed or wasn't configured
+      if (!absoluteMediaUrl || absoluteMediaUrl.startsWith("/")) {
+        const appUrl = process.env.APP_URL || "http://localhost:3000";
+        absoluteMediaUrl = `${appUrl.replace(/\/$/, "")}/${mediaUrl.replace(/^\//, "")}`;
+      }
     }
+
+    // Send the absolute media URL directly instead of proxying it. Meta's crawler supports Supabase public URLs perfectly fine.
+    const proxiedMediaUrl = absoluteMediaUrl;
 
     const payload = isVideo ? {
       phone: cleanPhone,
@@ -69,9 +110,10 @@ export async function sendWhatsAppViaCRM(
       template_language: "en",
       template_message_params: {
         body: [name || "there"], // Pass the customer's name dynamically to the template
-        headerMediaUrl: absoluteMediaUrl
+        headerMediaUrl: proxiedMediaUrl
       },
-      content_text: message // Keep message for fallback logging
+      content_text: `Hello! I made a personalized video and sample website design for ${name || "there"} — saw your amazing reviews about your beautiful collection of ethnic wear and the extremely friendly, attentive staff. Your clothing store has such a great reputation, and it truly deserves to show up properly online with a premium web presence. I recorded a quick video walkthrough showing how we can transform your digital storefront, get it live in just 1 week, and integrate complete premium features to attract more customers. I have attached the video here.`, // Override old AI text with exact template text so CRM UI shows the right message
+      media_url: proxiedMediaUrl // Add media_url to the root so CRM UI displays the video
     } : {
       phone: cleanPhone,
       message_type: "text",
@@ -98,6 +140,66 @@ export async function sendWhatsAppViaCRM(
     }
 
     console.log(`[CRM API Client] Message sent successfully! Msg ID: ${resJson.data?.messageId || resJson.data?.id}`);
+    
+    // Poll for asynchronous Meta webhook failures (like number not on WhatsApp, or spam blocks)
+    const msgId = resJson.data?.id;
+    const convId = resJson.data?.conversation_id;
+    
+    if (msgId && convId) {
+      console.log(`[CRM API Client] Polling for up to 12 seconds to check Meta delivery status...`);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        let isFailed = false;
+        
+        for (let i = 0; i < 4; i++) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          try {
+            const checkRes = await fetch(`${supabaseUrl}/rest/v1/messages?id=eq.${msgId}&select=status`, {
+              headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+            });
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              const currentStatus = checkData[0]?.status;
+              if (currentStatus === 'failed') {
+                isFailed = true;
+                break;
+              } else if (currentStatus === 'delivered' || currentStatus === 'read') {
+                break; // success confirmed
+              }
+            }
+          } catch (e) {
+            // ignore network errors during polling
+          }
+        }
+        
+        if (isFailed) {
+          // The webhook updates 'messages' to 'failed' first, then updates 'conversations.last_message_text'.
+          // Wait briefly to avoid a race condition before fetching the friendly error.
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          try {
+            for (let j = 0; j < 2; j++) {
+              const convRes = await fetch(`${supabaseUrl}/rest/v1/conversations?id=eq.${convId}&select=last_message_text`, {
+                headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+              });
+              if (convRes.ok) {
+                const convData = await convRes.json();
+                const lastText = convData[0]?.last_message_text || "Delivery failed.";
+                if (lastText.includes("❌")) {
+                  console.error(`[CRM API Client] Meta delivery failed asynchronously:`, lastText);
+                  return { success: false, error: lastText };
+                }
+              }
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (e) {}
+          return { success: false, error: "Delivery failed according to Meta." };
+        }
+      }
+    }
+
     return {
       success: true,
       messageId: resJson.data?.messageId || resJson.data?.id
