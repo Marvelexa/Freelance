@@ -1027,6 +1027,30 @@ async function startServer() {
     }
   });
 
+  app.post("/api/leads/summarize", async (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text || !text.trim()) {
+        return res.json({ success: true, summary: "No description available to summarize." });
+      }
+
+      const prompt = `You are a B2B sales assistant. Summarize the following project request or issue in exactly 1 or 2 concise sentences, focusing on:
+1. What the client wants to build/fix.
+2. The key technology stack (if mentioned).
+3. Any mention of budget or urgency.
+Keep it extremely concise, professional, and straight to the point. No introductory text.
+
+Text:
+${text}`;
+
+      const aiResponse = await generateContentWithFallback(prompt, "You are a helpful B2B assistant.");
+      res.json({ success: true, summary: aiResponse.text.trim() });
+    } catch (err) {
+      console.error("[Lead Summarizer] Error:", err);
+      res.json({ success: false, error: String(err) });
+    }
+  });
+
   app.post("/api/website/generate", async (req, res) => {
     // Generate website structure using Gemini
     try {

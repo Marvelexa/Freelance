@@ -90,6 +90,41 @@ export function LeadDiscovery() {
     }
   };
 
+  const [summaries, setSummaries] = useState<Record<string, { text: string; loading: boolean }>>({});
+
+  const handleSummarizeLead = async (leadId: string, description: string) => {
+    setSummaries(prev => ({
+      ...prev,
+      [leadId]: { text: "", loading: true }
+    }));
+
+    try {
+      const response = await fetch('/api/leads/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: description })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSummaries(prev => ({
+          ...prev,
+          [leadId]: { text: data.summary, loading: false }
+        }));
+      } else {
+        setSummaries(prev => ({
+          ...prev,
+          [leadId]: { text: "❌ Failed to generate AI summary.", loading: false }
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      setSummaries(prev => ({
+        ...prev,
+        [leadId]: { text: "❌ Error connecting to AI summarizer.", loading: false }
+      }));
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (searchSource === "maps" && (!niche || !city)) return;
@@ -344,10 +379,33 @@ export function LeadDiscovery() {
                          </div>
                          
                          {searchSource === "github" && lead.description && (
-                           <p className="text-xs text-muted-foreground bg-secondary/35 p-3 rounded-lg border border-border/40 mt-3 font-sans line-clamp-3 leading-relaxed">
-                             {highlightText(lead.description, searchedNiche)}
-                           </p>
-                         )}
+                            <div className="space-y-3 mt-3">
+                              <p className="text-xs text-muted-foreground bg-secondary/35 p-3 rounded-lg border border-border/40 font-sans line-clamp-3 leading-relaxed">
+                                {highlightText(lead.description, searchedNiche)}
+                              </p>
+                              
+                              <div className="text-[11px] leading-relaxed font-sans mt-2">
+                                {!summaries[lead.id] ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSummarizeLead(lead.id, lead.description)}
+                                    className="text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer bg-transparent border-none p-0 focus:outline-none"
+                                  >
+                                    ✨ Generate AI Summary
+                                  </button>
+                                ) : summaries[lead.id].loading ? (
+                                  <span className="text-muted-foreground italic flex items-center gap-1.5 animate-pulse">
+                                    ✨ Summarizing with AI...
+                                  </span>
+                                ) : (
+                                  <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/15 p-3 rounded-lg text-blue-700 dark:text-blue-200 text-xs flex flex-col gap-1">
+                                    <span className="font-bold flex items-center gap-1 text-blue-800 dark:text-blue-100">✨ AI Summary</span>
+                                    <p className="leading-relaxed font-sans">{summaries[lead.id].text}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                          
                          <div className="flex gap-4 text-xs pt-1.5 flex-wrap">
                            {lead.website ? (
