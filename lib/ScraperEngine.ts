@@ -438,6 +438,39 @@ export class ScraperEngine {
       await page.close();
     }
 
-    return results;
+    // Filter results to ensure they match the requested site domain (removes ads like Wix/Namecheap)
+    const siteMatch = query.match(/site:([^\s"]+)/);
+    const targetDomain = siteMatch ? siteMatch[1].split('/')[0].toLowerCase() : null;
+
+    const decodeUrl = (url: string) => {
+      if (url.includes('uddg=')) {
+        const parts = url.split('uddg=');
+        if (parts.length > 1) {
+          try {
+            return decodeURIComponent(parts[1].split('&')[0]);
+          } catch (e) {}
+        }
+      }
+      return url;
+    };
+
+    const cleanResults = results.map(r => {
+      const decodedUrl = decodeUrl(r.url);
+      return {
+        title: r.title,
+        url: decodedUrl,
+        snippet: r.snippet
+      };
+    }).filter(r => {
+      if (!targetDomain) return true;
+      const urlLower = r.url.toLowerCase();
+      if (targetDomain === 'x.com') {
+        return urlLower.includes('x.com') || urlLower.includes('twitter.com');
+      }
+      return urlLower.includes(targetDomain);
+    });
+
+    this.log(`Post-filtered results matching domain "${targetDomain || 'all'}": ${cleanResults.length} / ${results.length}`);
+    return cleanResults;
   }
 }
