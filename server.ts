@@ -1160,7 +1160,7 @@ ${text}`;
       if (!keyword) return res.status(400).json({ error: "Keyword is required" });
       
       const cleanKeyword = keyword.replace(/["']/g, "").trim();
-      const query = `site:linkedin.com/posts "hiring" OR "looking for a developer" "${cleanKeyword}"`;
+      const query = `site:linkedin.com "hiring" "${cleanKeyword}"`;
       
       const engine = new ScraperEngine();
       await engine.init();
@@ -1200,7 +1200,7 @@ ${text}`;
       if (!keyword) return res.status(400).json({ error: "Keyword is required" });
       
       const cleanKeyword = keyword.replace(/["']/g, "").trim();
-      const query = `site:x.com "looking for" OR "hiring" "${cleanKeyword}" developer`;
+      const query = `site:x.com "hiring" "${cleanKeyword}"`;
       
       const engine = new ScraperEngine();
       await engine.init();
