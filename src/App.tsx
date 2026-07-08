@@ -6,6 +6,8 @@ import { initAuth, googleSignIn, logout } from "./lib/firebase";
 import { Landing } from "./pages/Landing";
 import { SystemFlow } from "./pages/SystemFlow";
 import { LeadPipeline } from "./pages/LeadPipeline";
+import { LeadDiscovery } from "./pages/LeadDiscovery";
+import { LeadverseGuide } from "./pages/LeadverseGuide";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,6 +32,8 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/system" element={<SystemFlow />} />
             <Route path="/pipeline" element={<LeadPipeline />} />
+            <Route path="/discovery" element={<LeadDiscovery />} />
+            <Route path="/leadverse" element={<LeadverseGuide />} />
           </Routes>
         </main>
       </div>

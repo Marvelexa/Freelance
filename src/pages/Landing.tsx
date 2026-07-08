@@ -29,9 +29,9 @@ export function Landing() {
 
       {/* Action Button */}
       <div className="flex flex-col items-center gap-4">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 flex-wrap justify-center">
           <button 
-            onClick={() => navigate("/system")}
+            onClick={() => navigate("/discovery")}
             className="bg-[#111] hover:bg-black text-white px-10 py-4 text-lg font-medium rounded-[2rem] transition-transform hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
           >
             Get Started
@@ -40,7 +40,13 @@ export function Landing() {
             onClick={() => navigate("/pipeline")}
             className="bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 px-10 py-4 text-lg font-medium rounded-[2rem] transition-transform hover:scale-105 active:scale-95 shadow-md cursor-pointer"
           >
-            Import / View Leads
+            View Pipeline
+          </button>
+          <button 
+            onClick={() => navigate("/leadverse")}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white px-10 py-4 text-lg font-medium rounded-[2rem] transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-600/10 cursor-pointer"
+          >
+            Leadverse AI Guide
           </button>
         </div>
         <span className="text-sm text-gray-400 font-medium">Beta Access Only</span>
