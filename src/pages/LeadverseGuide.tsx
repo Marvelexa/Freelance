@@ -150,7 +150,7 @@ export function LeadverseGuide() {
                   {/* Code Block Visual */}
                   <div className="bg-[#08080a] rounded-xl border border-white/5 p-4 font-mono text-[10px] text-gray-300 overflow-x-auto space-y-1.5 leading-relaxed">
                     <div className="text-gray-500">// Leadverse.ai Git Scraper Hook</div>
-                    <div><span className="text-indigo-400">const</span> emailRegex = <span className="text-emerald-400">/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g</span>;</div>
+                    <div><span className="text-indigo-400">const</span> emailRegex = <span className="text-emerald-400">/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]&#123;2,&#125;/g</span>;</div>
                     <div><span className="text-indigo-400">async function</span> <span className="text-blue-400">extractEmail</span>(username, token) &#123;</div>
                     <div className="pl-4 text-gray-500">// Fetch user's public event streams</div>
                     <div className="pl-4"><span className="text-indigo-400">const</span> res = <span className="text-indigo-400">await</span> fetch(<span className="text-emerald-400">`users/$&#123;username&#125;/events/public`</span>);</div>
