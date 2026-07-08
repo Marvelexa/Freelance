@@ -28,6 +28,13 @@ export function LeadDiscovery() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: githubToken })
       });
+      if (!response.ok) {
+        setConnectionStatus({
+          success: false,
+          message: `❌ Server error: ${response.status} ${response.statusText}`
+        });
+        return;
+      }
       const data = await response.json();
       if (data.success) {
         setConnectionStatus({
