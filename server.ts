@@ -1173,7 +1173,7 @@ ${text}`;
       if (!keyword) return res.status(400).json({ error: "Keyword is required" });
       
       const cleanKeyword = keyword.replace(/["']/g, "").trim();
-      const query = `site:linkedin.com "hiring" "${cleanKeyword}"`;
+      const query = `site:linkedin.com/jobs "${cleanKeyword}"`;
       
       const engine = new ScraperEngine();
       await engine.init();
@@ -1194,16 +1194,16 @@ ${text}`;
         
         return {
           id: `linkedin-${Date.now()}-${i}`,
-          name: "LinkedIn Post Lead",
-          title: result.title.split(" | ")[0].split(" - ")[0].trim(),
-          rating: "LinkedIn Post",
+          name: "LinkedIn Job Opportunity",
+          title: result.title.replace(" - LinkedIn", "").replace(" | LinkedIn", "").trim(),
+          rating: "LinkedIn Job",
           address: result.url,
           website: result.url,
-          phone: "LinkedIn Gigs",
+          phone: "LinkedIn Jobs",
           email: email,
           niche: keyword,
           reviewsCount: 0,
-          description: result.snippet || "View post details on LinkedIn."
+          description: result.snippet || "View job details on LinkedIn."
         };
       });
       
