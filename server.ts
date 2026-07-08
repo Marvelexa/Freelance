@@ -1078,7 +1078,8 @@ ${text}`;
       if (!keyword) return res.status(400).json({ error: "Keyword is required" });
       
       const cleanKeyword = keyword.replace(/["']/g, "").trim();
-      const url = `https://www.freelancer.com/api/projects/0.1/projects/active?query=${encodeURIComponent(cleanKeyword)}&job_details=true&limit=${limit}`;
+      // Request 60 items so we can filter down to low bid counts
+      const url = `https://www.freelancer.com/api/projects/0.1/projects/active?query=${encodeURIComponent(cleanKeyword)}&job_details=true&limit=60`;
       
       console.log(`[Freelancer Discovery] Fetching query: "${cleanKeyword}"`);
       const response = await fetch(url, {
@@ -1092,7 +1093,19 @@ ${text}`;
       const data = await response.json();
       const projects = (data.result && data.result.projects) || [];
       
-      const leads = projects.map((proj: any) => {
+      const spamRegex = /\b(copy paste|data entry|work from home|earn money|typing job|survey|captcha entry|make money)\b/i;
+      
+      // Filter: Keep only projects with <= 15 bids to stay ahead, and exclude spam
+      const filteredProjects = projects.filter((proj: any) => {
+        const bidCount = (proj.bid_stats && proj.bid_stats.bid_count) || 0;
+        const titleText = proj.title || "";
+        const descText = proj.description || "";
+        const combinedText = `${titleText} \n ${descText}`;
+        
+        return bidCount <= 15 && !spamRegex.test(combinedText);
+      }).slice(0, limit);
+      
+      const leads = filteredProjects.map((proj: any) => {
         const minBudget = proj.budget.minimum || 0;
         const maxBudget = proj.budget.maximum || 0;
         const currency = (proj.currency && proj.currency.code) || "USD";
@@ -1167,7 +1180,14 @@ ${text}`;
       const rawResults = await engine.scrapeGoogleDork(query);
       await engine.close();
       
-      const leads = rawResults.map((result, i) => {
+      const spamRegex = /\b(copy paste|data entry|work from home|earn money|typing job|survey|captcha entry|make money)\b/i;
+      
+      const filteredResults = rawResults.filter(result => {
+        const combinedText = `${result.title} \n ${result.snippet || ""}`;
+        return !spamRegex.test(combinedText);
+      });
+      
+      const leads = filteredResults.map((result, i) => {
         const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
         const foundEmails = result.snippet.match(emailRegex);
         const email = foundEmails ? foundEmails[0] : "No public email";
@@ -1207,7 +1227,14 @@ ${text}`;
       const rawResults = await engine.scrapeGoogleDork(query);
       await engine.close();
       
-      const leads = rawResults.map((result, i) => {
+      const spamRegex = /\b(copy paste|data entry|work from home|earn money|typing job|survey|captcha entry|make money)\b/i;
+      
+      const filteredResults = rawResults.filter(result => {
+        const combinedText = `${result.title} \n ${result.snippet || ""}`;
+        return !spamRegex.test(combinedText);
+      });
+      
+      const leads = filteredResults.map((result, i) => {
         const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
         const foundEmails = result.snippet.match(emailRegex);
         const email = foundEmails ? foundEmails[0] : "No public email";
