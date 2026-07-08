@@ -371,4 +371,73 @@ export class ScraperEngine {
 
     return extractedLeads;
   }
+
+  async scrapeGoogleDork(query: string): Promise<Array<{ title: string; url: string; snippet: string }>> {
+    if (!this.browser) {
+      throw new Error("Browser not initialized. Call init() first.");
+    }
+
+    const page = await this.browser.newPage();
+    const results: Array<{ title: string; url: string; snippet: string }> = [];
+
+    try {
+      this.log(`Navigating to Google Search for query: "${query}"`);
+      await page.goto(`https://www.google.com/search?q=${encodeURIComponent(query)}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(1500);
+
+      const hasCaptcha = await page.evaluate(() => {
+        return document.body.innerHTML.includes('captcha') || document.body.innerHTML.includes('recaptcha') || document.body.innerHTML.includes('detecting unusual traffic');
+      });
+
+      if (hasCaptcha) {
+        this.log(`Google CAPTCHA challenge detected. Falling back to DuckDuckGo HTML...`);
+        await page.goto(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForTimeout(1000);
+        
+        const ddgResults = await page.evaluate(() => {
+          const items: any[] = [];
+          document.querySelectorAll('.result').forEach(el => {
+            const titleEl = el.querySelector('.result__title a');
+            const snippetEl = el.querySelector('.result__snippet');
+            if (titleEl && snippetEl) {
+              items.push({
+                title: titleEl.textContent?.trim() || "",
+                url: titleEl.getAttribute('href') || "",
+                snippet: snippetEl.textContent?.trim() || ""
+              });
+            }
+          });
+          return items;
+        });
+        return ddgResults;
+      }
+
+      const googleResults = await page.evaluate(() => {
+        const items: any[] = [];
+        document.querySelectorAll('div.g').forEach(el => {
+          const titleEl = el.querySelector('h3');
+          const linkEl = el.querySelector('a');
+          const snippetEl = el.querySelector('div[style*="-webkit-line-clamp"], .VwiC3b, .s3v9rd');
+          
+          if (titleEl && linkEl) {
+            items.push({
+              title: titleEl.textContent?.trim() || "",
+              url: linkEl.getAttribute('href') || "",
+              snippet: snippetEl ? snippetEl.textContent?.trim() || "" : ""
+            });
+          }
+        });
+        return items;
+      });
+
+      results.push(...googleResults);
+      this.log(`Extracted ${results.length} results from Google search.`);
+    } catch (e: any) {
+      this.log(`Error during Google Dorking: ${e.message}`);
+    } finally {
+      await page.close();
+    }
+
+    return results;
+  }
 }

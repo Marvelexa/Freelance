@@ -1072,6 +1072,168 @@ ${text}`;
     }
   });
 
+  app.post("/api/leads/discover/freelancer", async (req, res) => {
+    try {
+      const { keyword, limit = 15 } = req.body;
+      if (!keyword) return res.status(400).json({ error: "Keyword is required" });
+      
+      const cleanKeyword = keyword.replace(/["']/g, "").trim();
+      const url = `https://www.freelancer.com/api/projects/0.1/projects/active?query=${encodeURIComponent(cleanKeyword)}&job_details=true&limit=${limit}`;
+      
+      console.log(`[Freelancer Discovery] Fetching query: "${cleanKeyword}"`);
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'Freelance-Goldmine-Lead-Finder', 'Accept': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: `Freelancer API error: ${response.statusText}` });
+      }
+      
+      const data = await response.json();
+      const projects = (data.result && data.result.projects) || [];
+      
+      const leads = projects.map((proj: any) => {
+        const minBudget = proj.budget.minimum || 0;
+        const maxBudget = proj.budget.maximum || 0;
+        const currency = (proj.currency && proj.currency.code) || "USD";
+        const budgetStr = minBudget > 0 ? `${minBudget}-${maxBudget} ${currency}` : "Hourly/Contract";
+        
+        return {
+          id: `freelancer-${proj.id}`,
+          name: `Freelancer Project | ID: ${proj.id}`,
+          title: proj.title,
+          rating: `💰 Budget: ${budgetStr}`,
+          address: `https://www.freelancer.com/projects/${proj.seo_url}`,
+          website: `https://www.freelancer.com/projects/${proj.seo_url}`,
+          phone: "Freelancer.com Gigs",
+          email: "No public email",
+          niche: keyword,
+          reviewsCount: proj.bid_stats ? proj.bid_stats.bid_count : 0,
+          description: proj.description || "No description available."
+        };
+      });
+      
+      res.json({ status: "SUCCESS", results: leads });
+    } catch (err) {
+      console.error("[Freelancer Lead Discovery] Error:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post("/api/leads/discover/upwork", async (req, res) => {
+    try {
+      const { keyword } = req.body;
+      if (!keyword) return res.status(400).json({ error: "Keyword is required" });
+      
+      const cleanKeyword = keyword.replace(/["']/g, "").trim();
+      const query = `site:upwork.com/jobs "${cleanKeyword}"`;
+      
+      const engine = new ScraperEngine();
+      await engine.init();
+      const rawResults = await engine.scrapeGoogleDork(query);
+      await engine.close();
+      
+      const leads = rawResults.map((result, i) => ({
+        id: `upwork-${Date.now()}-${i}`,
+        name: "Upwork Job Opportunity",
+        title: result.title.replace(" - Upwork", "").replace(" | Upwork", "").trim(),
+        rating: "Upwork Gig",
+        address: result.url,
+        website: result.url,
+        phone: "Upwork Job Board",
+        email: "No public email",
+        niche: keyword,
+        reviewsCount: 0,
+        description: result.snippet || "View details on Upwork."
+      }));
+      
+      res.json({ status: "SUCCESS", results: leads });
+    } catch (err) {
+      console.error("[Upwork Lead Discovery] Error:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post("/api/leads/discover/linkedin", async (req, res) => {
+    try {
+      const { keyword } = req.body;
+      if (!keyword) return res.status(400).json({ error: "Keyword is required" });
+      
+      const cleanKeyword = keyword.replace(/["']/g, "").trim();
+      const query = `site:linkedin.com/posts "hiring" OR "looking for a developer" "${cleanKeyword}"`;
+      
+      const engine = new ScraperEngine();
+      await engine.init();
+      const rawResults = await engine.scrapeGoogleDork(query);
+      await engine.close();
+      
+      const leads = rawResults.map((result, i) => {
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        const foundEmails = result.snippet.match(emailRegex);
+        const email = foundEmails ? foundEmails[0] : "No public email";
+        
+        return {
+          id: `linkedin-${Date.now()}-${i}`,
+          name: "LinkedIn Post Lead",
+          title: result.title.split(" | ")[0].split(" - ")[0].trim(),
+          rating: "LinkedIn Post",
+          address: result.url,
+          website: result.url,
+          phone: "LinkedIn Gigs",
+          email: email,
+          niche: keyword,
+          reviewsCount: 0,
+          description: result.snippet || "View post details on LinkedIn."
+        };
+      });
+      
+      res.json({ status: "SUCCESS", results: leads });
+    } catch (err) {
+      console.error("[LinkedIn Lead Discovery] Error:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post("/api/leads/discover/twitter", async (req, res) => {
+    try {
+      const { keyword } = req.body;
+      if (!keyword) return res.status(400).json({ error: "Keyword is required" });
+      
+      const cleanKeyword = keyword.replace(/["']/g, "").trim();
+      const query = `site:x.com "looking for" OR "hiring" "${cleanKeyword}" developer`;
+      
+      const engine = new ScraperEngine();
+      await engine.init();
+      const rawResults = await engine.scrapeGoogleDork(query);
+      await engine.close();
+      
+      const leads = rawResults.map((result, i) => {
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        const foundEmails = result.snippet.match(emailRegex);
+        const email = foundEmails ? foundEmails[0] : "No public email";
+        
+        return {
+          id: `twitter-${Date.now()}-${i}`,
+          name: "Twitter/X Post Lead",
+          title: result.title.replace("on X:", "").replace("on Twitter:", "").trim(),
+          rating: "Twitter/X Gig",
+          address: result.url,
+          website: result.url,
+          phone: "Twitter/X Gigs",
+          email: email,
+          niche: keyword,
+          reviewsCount: 0,
+          description: result.snippet || "View details on Twitter/X."
+        };
+      });
+      
+      res.json({ status: "SUCCESS", results: leads });
+    } catch (err) {
+      console.error("[Twitter Lead Discovery] Error:", err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.post("/api/website/generate", async (req, res) => {
     // Generate website structure using Gemini
     try {

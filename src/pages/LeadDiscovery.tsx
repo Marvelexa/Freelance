@@ -9,7 +9,7 @@ import { saveLeadToSheet } from "../lib/sheets";
 import { cn } from "@/lib/utils";
 
 export function LeadDiscovery() {
-  const [searchSource, setSearchSource] = useState<"maps" | "github">("maps");
+  const [searchSource, setSearchSource] = useState<"maps" | "github" | "linkedin" | "twitter" | "upwork" | "freelancer">("maps");
   const [niche, setNiche] = useState("");
   const [city, setCity] = useState("");
   const [githubToken, setGithubToken] = useState("");
@@ -128,7 +128,7 @@ export function LeadDiscovery() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (searchSource === "maps" && (!niche || !city)) return;
-    if (searchSource === "github" && !niche) return;
+    if (searchSource !== "maps" && !niche) return;
     
     setIsSearching(true);
     setSearchedNiche(niche);
@@ -145,7 +145,7 @@ export function LeadDiscovery() {
           setLeads(data.results);
         }
       } else {
-        const response = await fetch('/api/leads/discover/github', {
+        const response = await fetch(`/api/leads/discover/${searchSource}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ keyword: niche, token: githubToken, limit: 20 })
@@ -203,7 +203,7 @@ export function LeadDiscovery() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Lead Discovery Engine</h1>
-              <p className="text-muted-foreground mt-2">Find and extract high-value clients across Google Maps and GitHub Gigs.</p>
+              <p className="text-muted-foreground mt-2">Find and extract high-value clients across Google Maps, GitHub, LinkedIn, Twitter/X, Upwork, and Freelancer.</p>
             </div>
             {searchSource === "github" && (
               <Button 
@@ -218,33 +218,30 @@ export function LeadDiscovery() {
             )}
           </div>
 
-          <div className="flex gap-2 p-1 bg-muted/50 rounded-lg self-start border border-border/40 max-w-sm">
-            <button
-              type="button"
-              onClick={() => { setSearchSource("maps"); setLeads([]); }}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-                searchSource === "maps"
-                  ? "bg-card text-foreground shadow-sm border border-border/30"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              Google Maps (Local)
-            </button>
-            <button
-              type="button"
-              onClick={() => { setSearchSource("github"); setLeads([]); }}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-                searchSource === "github"
-                  ? "bg-card text-foreground shadow-sm border border-border/30"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Github className="w-3.5 h-3.5" />
-              GitHub Gigs & Jobs
-            </button>
+          <div className="flex flex-wrap gap-2 p-1 bg-muted/50 rounded-lg self-start border border-border/40 max-w-3xl">
+            {[
+              { id: "maps", label: "Google Maps", icon: <Building2 className="w-3.5 h-3.5" /> },
+              { id: "github", label: "GitHub Gigs", icon: <Github className="w-3.5 h-3.5" /> },
+              { id: "linkedin", label: "LinkedIn Posts", icon: <Link2 className="w-3.5 h-3.5" /> },
+              { id: "twitter", label: "Twitter/X Gigs", icon: <Search className="w-3.5 h-3.5" /> },
+              { id: "upwork", label: "Upwork Gigs", icon: <Search className="w-3.5 h-3.5" /> },
+              { id: "freelancer", label: "Freelancer Gigs", icon: <Search className="w-3.5 h-3.5" /> }
+            ].map(src => (
+              <button
+                key={src.id}
+                type="button"
+                onClick={() => { setSearchSource(src.id as any); setLeads([]); }}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  searchSource === src.id
+                    ? "bg-card text-foreground shadow-sm border border-border/30"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {src.icon}
+                {src.label}
+              </button>
+            ))}
           </div>
 
           {showTokenSettings && searchSource === "github" && (
@@ -343,42 +340,48 @@ export function LeadDiscovery() {
                    <CardContent className="p-6">
                      <div className="flex items-start justify-between">
                        <div className="space-y-3 flex-1 mr-4">
-                         <div>
-                            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 flex-wrap">
-                              {searchSource === "github" ? (
-                                <>
-                                  <Github className="w-4 h-4 text-muted-foreground" />
-                                  <span>{highlightText(lead.title, searchedNiche)}</span>
-                                </>
-                              ) : (
-                                <span>{highlightText(lead.name, searchedNiche)}</span>
-                              )}
-                              {searchSource === "maps" && !lead.website && <Badge variant="destructive" className="py-0 h-5">No Website</Badge>}
-                              {searchSource === "github" && lead.email !== "No public email" && (
-                                <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-600 py-0 h-5 text-white">Email Found</Badge>
-                              )}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
-                              <Star className="w-3.5 h-3.5 fill-primary text-primary" />
-                              <span className="font-medium text-foreground">{lead.rating}</span>
-                              {searchSource === "maps" && (
-                                <>
-                                  <span>({lead.reviewsCount || 0} reviews)</span>
-                                  <span className="px-1.5">•</span>
-                                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {lead.address}</span>
-                                </>
-                              )}
-                              {searchSource === "github" && (
-                                <>
-                                  <span>({lead.reviewsCount || 0} comments)</span>
-                                  <span className="px-1.5">•</span>
-                                  <span className="font-semibold text-muted-foreground">{lead.name.split(" | ")[0]}</span>
-                                </>
-                              )}
-                            </div>
+                         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 flex-wrap">
+                           {searchSource === "maps" ? (
+                             <span>{highlightText(lead.name, searchedNiche)}</span>
+                           ) : (
+                             <>
+                               {searchSource === "github" && <Github className="w-4 h-4 text-muted-foreground" />}
+                               {searchSource === "linkedin" && <Link2 className="w-4 h-4 text-muted-foreground" />}
+                               {searchSource === "twitter" && <Search className="w-4 h-4 text-muted-foreground" />}
+                               {searchSource === "upwork" && <Search className="w-4 h-4 text-muted-foreground" />}
+                               {searchSource === "freelancer" && <Search className="w-4 h-4 text-muted-foreground" />}
+                               <span>{highlightText(lead.title || lead.name, searchedNiche)}</span>
+                             </>
+                           )}
+                           {searchSource === "maps" && !lead.website && <Badge variant="destructive" className="py-0 h-5">No Website</Badge>}
+                           {searchSource !== "maps" && lead.email && lead.email !== "No public email" && (
+                             <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-600 py-0 h-5 text-white">Email Found</Badge>
+                           )}
+                         </h3>
+                         <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
+                           <Star className="w-3.5 h-3.5 fill-primary text-primary" />
+                           <span className="font-medium text-foreground">{lead.rating}</span>
+                           {searchSource === "maps" && (
+                             <>
+                               <span>({lead.reviewsCount || 0} reviews)</span>
+                               <span className="px-1.5">•</span>
+                               <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {lead.address}</span>
+                             </>
+                           )}
+                           {searchSource !== "maps" && (
+                             <>
+                               {lead.reviewsCount > 0 && (
+                                 <>
+                                   <span>({lead.reviewsCount} {searchSource === "freelancer" ? "bids" : "comments"})</span>
+                                   <span className="px-1.5">•</span>
+                                 </>
+                               )}
+                               <span className="font-semibold text-muted-foreground">{lead.name.split(" | ")[0]}</span>
+                             </>
+                           )}
                          </div>
                          
-                         {searchSource === "github" && lead.description && (
+                         {searchSource !== "maps" && lead.description && (
                             <div className="space-y-3 mt-3">
                               <p className="text-xs text-muted-foreground bg-secondary/35 p-3 rounded-lg border border-border/40 font-sans line-clamp-3 leading-relaxed">
                                 {highlightText(lead.description, searchedNiche)}
@@ -433,9 +436,14 @@ export function LeadDiscovery() {
                              </span>
                            )}
                            
-                           {searchSource === "github" && lead.address && (
+                           {searchSource !== "maps" && lead.address && (
                              <a href={lead.address} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-primary hover:underline">
-                               <Github className="w-3.5 h-3.5" /> Open Issue / Thread
+                               {searchSource === "github" && <Github className="w-3.5 h-3.5" />}
+                               {searchSource === "linkedin" && <Link2 className="w-3.5 h-3.5" />}
+                               {searchSource === "twitter" && <Search className="w-3.5 h-3.5" />}
+                               {searchSource === "upwork" && <Search className="w-3.5 h-3.5" />}
+                               {searchSource === "freelancer" && <Search className="w-3.5 h-3.5" />}
+                               Open Project / Thread
                              </a>
                            )}
                          </div>
@@ -453,13 +461,13 @@ export function LeadDiscovery() {
             !isSearching && (
               <div className="text-center py-20 bg-card/20 border border-dashed border-border rounded-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-secondary mx-auto flex items-center justify-center mb-4">
-                  {searchSource === "maps" ? <Building2 className="w-8 h-8 text-muted-foreground" /> : <Github className="w-8 h-8 text-muted-foreground" />}
+                  {searchSource === "maps" ? <Building2 className="w-8 h-8 text-muted-foreground" /> : <Search className="w-8 h-8 text-muted-foreground" />}
                 </div>
                 <h3 className="text-xl font-semibold mb-2">No leads found yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   {searchSource === "maps" 
                     ? "Enter a niche and city above to start discovering high-value local businesses."
-                    : 'Search GitHub Gigs (e.g. "need a website" or "looking for developer") to find active leads.'}
+                    : `Search ${searchSource.charAt(0).toUpperCase() + searchSource.slice(1)} (e.g. "need a website" or "looking for developer") to find active leads.`}
                 </p>
               </div>
             )
