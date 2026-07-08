@@ -872,8 +872,24 @@ async function startServer() {
         return res.status(400).json({ error: "Keyword is required" });
       }
 
-      // Build GitHub search query
-      const query = keyword.includes("is:") ? keyword : `"${keyword}" is:issue state:open`;
+      // Calculate date 30 days ago to keep leads fresh
+      const dateLimit = new Date();
+      dateLimit.setDate(dateLimit.getDate() - 30);
+      const dateString = dateLimit.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // Build GitHub search query with hiring keywords & age limit
+      const cleanKeyword = keyword.replace(/["']/g, "").trim();
+      const hasHiringIntent = /looking for|need|hiring|freelance|job|developer|website|contract/i.test(cleanKeyword);
+      
+      let query = "";
+      if (keyword.includes("is:")) {
+        query = keyword;
+      } else if (hasHiringIntent) {
+        query = `${cleanKeyword} is:issue state:open created:>=${dateString}`;
+      } else {
+        query = `"${cleanKeyword}" ("looking for" OR "hiring" OR "need" OR "freelance" OR "job" OR "developer" OR "website") is:issue state:open created:>=${dateString}`;
+      }
+
       const searchUrl = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=created&order=desc&per_page=${limit}`;
 
       const headers: Record<string, string> = {
@@ -896,9 +912,9 @@ async function startServer() {
       const items = searchData.items || [];
 
       // Extract details in parallel
-      const leads = await Promise.all(items.map(async (item: any) => {
+      const rawLeads = await Promise.all(items.map(async (item: any) => {
         // Regex email extraction from body
-        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]&#123;2,&#125;/g;
         const bodyText = item.body || "";
         const titleText = item.title || "";
         const combinedText = `${titleText} \n ${bodyText}`;
@@ -919,6 +935,7 @@ async function startServer() {
         let repoStars = 0;
         let userEmail = null;
         let userRealName = null;
+        let isIrrelevant = false;
 
         // Fetch additional info if possible
         try {
@@ -927,6 +944,10 @@ async function startServer() {
             if (repoRes.ok) {
               const repoData = await repoRes.json();
               repoStars = repoData.stargazers_count || 0;
+              // Filter out large popular repositories which are not client jobs
+              if (repoStars > 150) {
+                isIrrelevant = true;
+              }
             }
           }
           
@@ -941,6 +962,8 @@ async function startServer() {
         } catch (e) {
           // Fail silently on extra fetches
         }
+
+        if (isIrrelevant) return null;
 
         const finalEmail = email || userEmail || "No public email";
         const finalName = userRealName ? `${userRealName} (${item.user.login})` : item.user.login;
@@ -961,6 +984,7 @@ async function startServer() {
         };
       }));
 
+      const leads = rawLeads.filter(Boolean);
       res.json({ status: "SUCCESS", results: leads });
     } catch (err) {
       console.error("[GitHub Lead Discovery] Error:", err);
