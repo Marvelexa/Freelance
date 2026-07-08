@@ -890,7 +890,8 @@ async function startServer() {
         query = `"${cleanKeyword}" ("looking for" OR "hiring" OR "need" OR "freelance" OR "developer") is:issue state:open created:>=${dateString}`;
       }
 
-      const searchUrl = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=created&order=desc&per_page=${limit}`;
+      // Query 60 items from GitHub to filter down to high-quality results
+      const searchUrl = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=created&order=desc&per_page=60`;
 
       const headers: Record<string, string> = {
         'User-Agent': 'Freelance-Goldmine-Lead-Finder',
@@ -911,10 +912,28 @@ async function startServer() {
       const searchData = await response.json();
       const items = searchData.items || [];
 
-      // Extract details in parallel
-      const rawLeads = await Promise.all(items.map(async (item: any) => {
+      // High-precision regex definitions
+      const buyingRegex = /\b(looking for a developer|looking for a designer|looking for someone to build|looking for web developer|need a website|need a developer|hiring|hire|freelancer|job offer|freelance)\b/i;
+      const excludeRegex = /\b(good first issue|help wanted|prs welcome|pull request welcome|hacktoberfest|contribute|contribution|contributor|open-source|open source)\b/i;
+
+      // First Pass: Filter out non-hiring posts and open-source noise
+      const filteredItems = items.filter((item: any) => {
+        const titleText = item.title || "";
+        const bodyText = item.body || "";
+        const combinedText = `${titleText} \n ${bodyText}`;
+        
+        const hasOS = excludeRegex.test(combinedText);
+        const hasHiring = buyingRegex.test(combinedText);
+
+        return hasHiring && !hasOS;
+      }).slice(0, limit);
+
+      console.log(`[GitHub Discovery] Pre-filtered ${items.length} items down to ${filteredItems.length} high-quality leads.`);
+
+      // Second Pass: Extract details in parallel for kept items only
+      const rawLeads = await Promise.all(filteredItems.map(async (item: any) => {
         // Regex email extraction from body
-        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]&#123;2,&#125;/g;
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
         const bodyText = item.body || "";
         const titleText = item.title || "";
         const combinedText = `${titleText} \n ${bodyText}`;
