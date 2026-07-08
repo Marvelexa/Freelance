@@ -915,8 +915,9 @@ async function startServer() {
       // High-precision regex definitions
       const buyingRegex = /\b(looking for a developer|looking for a designer|looking for someone to build|looking for web developer|need a website|need a developer|hiring|hire|freelancer|job offer|freelance)\b/i;
       const excludeRegex = /\b(good first issue|help wanted|prs welcome|pull request welcome|hacktoberfest|contribute|contribution|contributor|open-source|open source)\b/i;
+      const sellerRegex = /\b(web development company|website design services|web design services|seo services|digital marketing agency|ppc services|web development agency|software development company|we offer|our services|we specialize in|leading agency|professional website design|dedicated developers|boost your business|top-tier|marketing campaigns|services in|ein filing|tax services|incorporation services)\b/i;
 
-      // First Pass: Filter out non-hiring posts and open-source noise
+      // First Pass: Filter out non-hiring posts, open-source noise, and seller promotions
       const filteredItems = items.filter((item: any) => {
         const titleText = item.title || "";
         const bodyText = item.body || "";
@@ -924,8 +925,9 @@ async function startServer() {
         
         const hasOS = excludeRegex.test(combinedText);
         const hasHiring = buyingRegex.test(combinedText);
+        const isSeller = sellerRegex.test(combinedText);
 
-        return hasHiring && !hasOS;
+        return hasHiring && !hasOS && !isSeller;
       }).slice(0, limit);
 
       console.log(`[GitHub Discovery] Pre-filtered ${items.length} items down to ${filteredItems.length} high-quality leads.`);
