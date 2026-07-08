@@ -463,11 +463,30 @@ export class ScraperEngine {
       };
     }).filter(r => {
       if (!targetDomain) return true;
-      const urlLower = r.url.toLowerCase();
-      if (targetDomain === 'x.com') {
-        return urlLower.includes('x.com') || urlLower.includes('twitter.com');
+      try {
+        const urlWithProto = r.url.startsWith('http') || r.url.startsWith('//') ? r.url : `https://${r.url}`;
+        const parsedUrl = new URL(urlWithProto.startsWith('//') ? `https:${urlWithProto}` : urlWithProto);
+        const host = parsedUrl.hostname.toLowerCase();
+        
+        // Block sponsored tracking redirects pointing back to duckduckgo
+        if (host.includes('duckduckgo.com')) {
+          return false;
+        }
+        
+        if (targetDomain === 'x.com') {
+          return host.includes('x.com') || host.includes('twitter.com');
+        }
+        return host.includes(targetDomain);
+      } catch (e) {
+        const urlLower = r.url.toLowerCase();
+        if (urlLower.includes('duckduckgo.com/y.js') || urlLower.includes('duckduckgo.com/l/?')) {
+          return false;
+        }
+        if (targetDomain === 'x.com') {
+          return urlLower.includes('x.com') || urlLower.includes('twitter.com');
+        }
+        return urlLower.includes(targetDomain);
       }
-      return urlLower.includes(targetDomain);
     });
 
     this.log(`Post-filtered results matching domain "${targetDomain || 'all'}": ${cleanResults.length} / ${results.length}`);
