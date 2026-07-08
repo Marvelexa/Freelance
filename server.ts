@@ -880,8 +880,9 @@ async function startServer() {
         'User-Agent': 'Freelance-Goldmine-Lead-Finder',
         'Accept': 'application/vnd.github.v3+json',
       };
-      if (token && token.trim()) {
-        headers['Authorization'] = `token ${token.trim()}`;
+      const resolvedToken = (token && token.trim()) || process.env.GITHUB_TOKEN;
+      if (resolvedToken && resolvedToken.trim()) {
+        headers['Authorization'] = `token ${resolvedToken.trim()}`;
       }
 
       console.log(`[GitHub Discovery] Fetching query: "${query}"`);
