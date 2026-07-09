@@ -48,21 +48,21 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
 
   return (
     <div
-      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-neutral-950 via-stone-900 to-black transition-all duration-500 ease-in-out ${
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-[#faf9f6] via-white to-[#f5f0eb] transition-all duration-500 ease-in-out ${
         fadeAway ? "opacity-0 scale-105 pointer-events-none" : "opacity-100 scale-100"
       }`}
     >
-      {/* Dynamic Glowing Accent in Background */}
-      <div className="absolute w-[450px] h-[450px] rounded-full bg-radial from-amber-950/40 via-amber-900/5 to-transparent blur-3xl animate-pulse pointer-events-none z-0" />
+      {/* Dynamic Glowing Warm Accent in Background */}
+      <div className="absolute w-[450px] h-[450px] rounded-full bg-radial from-[#d97706]/10 via-[#d97706]/1 to-transparent blur-3xl animate-pulse pointer-events-none z-0" />
 
       {/* Premium Glass Card Container */}
-      <div className="relative z-10 flex flex-col items-center bg-stone-900/30 border border-stone-800/40 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] backdrop-blur-2xl rounded-3xl px-12 py-16 max-w-sm w-full mx-4 text-center">
+      <div className="relative z-10 flex flex-col items-center bg-white/50 border border-white/90 shadow-[0_32px_64px_-16px_rgba(120,53,4,0.06)] backdrop-blur-2xl rounded-3xl px-12 py-16 max-w-sm w-full mx-4 text-center">
         
         {/* Animated Brand Emblem */}
-        <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 shadow-inner flex items-center justify-center mb-8 relative">
-          <div className="absolute inset-0 rounded-2xl bg-amber-500/20 animate-ping opacity-30" />
+        <div className="w-20 h-20 rounded-2xl bg-[#d97706]/10 border border-[#d97706]/20 shadow-inner flex items-center justify-center mb-8 relative">
+          <div className="absolute inset-0 rounded-2xl bg-[#d97706]/20 animate-ping opacity-30" />
           <svg 
-            className="w-10 h-10 text-amber-500 animate-pulse" 
+            className="w-10 h-10 text-[#b45309] animate-pulse" 
             fill="none" 
             stroke="currentColor" 
             strokeWidth="1.5" 
@@ -79,32 +79,24 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
         </div>
 
         {/* Business Title */}
-        <h1 
-          className="text-3xl font-black tracking-widest text-stone-100 uppercase mb-2 font-serif select-none"
-          style={{
-            background: "linear-gradient(90deg, #d97706, #fef3c7, #b45309, #fef3c7, #d97706)",
-            backgroundSize: "200% auto",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent"
-          }}
-        >
+        <h1 className="text-3xl font-black tracking-widest text-[#2d1b14] uppercase mb-2 font-serif select-none">
           {businessName}
         </h1>
 
-        <p className="text-[10px] font-bold tracking-[0.4em] text-stone-400 uppercase mb-10 select-none">
+        <p className="text-[10px] font-bold tracking-[0.4em] text-[#b45309]/60 uppercase mb-10 select-none">
           Brewing Perfection
         </p>
 
         {/* Custom Progress Bar */}
-        <div className="w-full h-1.5 bg-stone-900 border border-stone-800 rounded-full overflow-hidden relative">
+        <div className="w-full h-1.5 bg-[#f5eef5]/30 border border-[#b45309]/10 rounded-full overflow-hidden relative">
           <div 
-            className="h-full bg-gradient-to-r from-amber-600 to-amber-500 rounded-full transition-all duration-300 ease-out"
+            className="h-full bg-gradient-to-r from-[#d97706] to-[#f59e0b] rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
 
         {/* Progress Percent */}
-        <span className="text-[10px] font-bold font-mono tracking-widest text-stone-500 mt-3 select-none">
+        <span className="text-[10px] font-bold font-mono tracking-widest text-[#b45309]/60 mt-3 select-none">
           {progress}%
         </span>
       </div>
