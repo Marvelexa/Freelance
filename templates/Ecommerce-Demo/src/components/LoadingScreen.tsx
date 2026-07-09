@@ -48,101 +48,70 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
 
   return (
     <div
-      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-white transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        fadeAway ? "opacity-0 scale-[1.02] pointer-events-none" : "opacity-100 scale-100"
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black transition-[opacity,transform] duration-750 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        fadeAway ? "opacity-0 scale-[1.03] pointer-events-none" : "opacity-100 scale-100"
       }`}
     >
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes subtle-fade-in-up {
+        @keyframes blur-reveal {
           0% {
             opacity: 0;
-            transform: translateY(16px);
+            filter: blur(16px);
+            transform: scale(1.12);
           }
           100% {
             opacity: 1;
-            transform: translateY(0);
+            filter: blur(0px);
+            transform: scale(1);
           }
         }
-        .animate-emblem {
-          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        @keyframes subtle-fade {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
-        .animate-title {
-          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+        .animate-blur-char {
+          display: inline-block;
           opacity: 0;
+          animation: blur-reveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        .animate-tagline {
-          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
-          opacity: 0;
-        }
-        .animate-loader {
-          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
-          opacity: 0;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .animate-emblem, .animate-title, .animate-tagline, .animate-loader {
-            animation: none !important;
-            opacity: 1 !important;
-            transform: none !important;
-          }
+        .animate-subtle-fade {
+          animation: subtle-fade 1.2s ease-in-out forwards;
         }
       `}} />
 
-      {/* Decorative Ultra-soft Radial Ambient Light */}
+      {/* Decorative Subtle Dark Radial Ambient Light */}
       <div 
-        className="absolute w-[600px] h-[600px] rounded-full bg-radial from-blue-100/30 via-transparent to-transparent blur-3xl pointer-events-none z-0" 
+        className="absolute w-[500px] h-[500px] rounded-full bg-radial from-blue-900/5 via-transparent to-transparent blur-3xl pointer-events-none z-0" 
         style={{ transform: 'translate3d(0,0,0)' }}
       />
 
       <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-8 text-center select-none">
         
-        {/* Sleek Floating Icon */}
-        <div className="animate-emblem mb-8 relative flex items-center justify-center">
-          <div className="absolute inset-0 w-16 h-16 rounded-full bg-blue-500/[0.02] border border-blue-500/[0.04] animate-pulse" />
-          <div className="relative w-16 h-16 rounded-full bg-white border border-blue-200/60 shadow-[0_8px_16px_rgba(0,0,0,0.02)] flex items-center justify-center">
-            <svg 
-              className="w-7 h-7 text-blue-600" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="1.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+        {/* Business Title - Cinematic Letter-by-Letter Blur Reveal */}
+        <h1 className="text-[2.85rem] font-bold tracking-[0.1em] text-white uppercase font-sans mb-8">
+          {businessName.split("").map((char, index) => (
+            <span 
+              key={index} 
+              className="animate-blur-char" 
+              style={{ animationDelay: `${index * 0.12}s` }}
             >
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 0 1-8 0" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Business Title - Clean, elegant typography */}
-        <h1 className="animate-title text-[2.75rem] font-bold tracking-tight text-slate-900 uppercase font-sans mb-3 text-wrap-balance">
-          {businessName}
+              {char === " " ? "\u00A0" : char}
+            </span>
+          ))}
         </h1>
 
-        <p className="animate-tagline text-[11px] font-semibold tracking-[0.5em] text-blue-500/60 uppercase mb-12">
-          Smart Store Experience
-        </p>
-
-        {/* Progress Bar Area */}
-        <div className="animate-loader w-full flex flex-col items-center">
-          {/* Extremely thin elegant loading bar */}
-          <div className="w-48 h-[2px] bg-slate-100 rounded-full overflow-hidden relative">
-            <div 
-              className="h-full bg-gradient-to-r from-blue-600 to-blue-500 rounded-full transition-[width] duration-300 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          <span className="text-[10px] font-bold font-mono tracking-widest text-slate-400 mt-4">
-            {progress}%
-          </span>
-          
-          <span className="text-[10px] font-bold tracking-[0.2em] text-blue-500/50 uppercase mt-2">
-            Loading…
-          </span>
+        {/* Extremely thin elegant loading bar */}
+        <div className="animate-subtle-fade w-48 h-[1px] bg-zinc-900 rounded-full overflow-hidden relative mb-4">
+          <div 
+            className="h-full bg-white rounded-full transition-[width] duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
         </div>
+
+        {/* Cinematic Subtitle */}
+        <p className="animate-subtle-fade text-[9px] font-medium tracking-[0.4em] text-zinc-500 uppercase">
+          PREMIUM SMART STORE EXPERIENCE
+        </p>
       </div>
     </div>
   );
