@@ -47,9 +47,11 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
 
   if (!visible) return null;
 
+  const words = businessName.split(" ");
+
   return (
     <div
-      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-white transition-[opacity,transform] duration-750 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-white transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         fadeAway ? "opacity-0 scale-[1.02] pointer-events-none" : "opacity-100 scale-100"
       }`}
     >
@@ -89,15 +91,24 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
 
       <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-8 text-center select-none">
         
-        {/* Business Title - Light Cinematic Letter-by-Letter Blur Reveal */}
-        <h1 className="text-[2.75rem] font-black tracking-[0.12em] uppercase font-sans mb-8">
-          {businessName.split("").map((char, index) => (
-            <span 
-              key={index} 
-              className="animate-blur-char" 
-              style={{ animationDelay: `${index * 0.08}s` }}
-            >
-              {char === " " ? "\u00A0" : char}
+        {/* Business Title - Light Cinematic Letter-by-Letter Blur Reveal with Whole Word Wrapping */}
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-[0.12em] uppercase font-sans mb-8 flex flex-wrap justify-center gap-y-2">
+          {words.map((word, wordIndex) => (
+            <span key={wordIndex} className="inline-block whitespace-nowrap">
+              {word.split("").map((char, charIndex) => {
+                const globalIndex = words.slice(0, wordIndex).join(" ").length + (wordIndex > 0 ? 1 : 0) + charIndex;
+                return (
+                  <span 
+                    key={charIndex} 
+                    className="animate-blur-char" 
+                    style={{ animationDelay: `${globalIndex * 0.08}s` }}
+                  >
+                    {char}
+                  </span>
+                );
+              })}
+              {/* Spacer between words */}
+              {wordIndex < words.length - 1 && <span className="inline-block">&nbsp;</span>}
             </span>
           ))}
         </h1>
