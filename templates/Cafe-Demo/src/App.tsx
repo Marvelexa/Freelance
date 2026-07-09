@@ -5,11 +5,15 @@ import Hero from './components/Hero';
 import Menu from './components/Menu';
 import Reservation from './components/Reservation';
 import Footer from './components/Footer';
+import LoadingScreen from './components/LoadingScreen';
 
 export default function App() {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
+  const [showLoading, setShowLoading] = useState(true);
+
+  const businessName = new URLSearchParams(window.location.search).get('name') || "The Roastery";
 
   const addToCart = (item: any) => {
     setCartItems([...cartItems, item]);
@@ -26,6 +30,12 @@ export default function App() {
 
   return (
     <div className="w-full min-h-screen bg-secondary selection:bg-accent selection:text-white flex flex-col font-sans">
+      {showLoading && (
+        <LoadingScreen 
+          businessName={businessName} 
+          onFinished={() => setShowLoading(false)} 
+        />
+      )}
       <Navbar cartCount={cartItems.length} />
       <main className="flex-1">
         <Hero />
