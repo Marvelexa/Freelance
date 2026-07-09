@@ -13,7 +13,7 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
   useEffect(() => {
     const interval = setInterval(() => {
       setProgress((old) => {
-        const increment = Math.floor(Math.random() * 15) + 5;
+        const increment = Math.floor(Math.random() * 12) + 6;
         const next = old + increment;
         if (next >= 100) {
           clearInterval(interval);
@@ -30,12 +30,12 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
     if (progress === 100) {
       const fadeTimer = setTimeout(() => {
         setFadeAway(true);
-      }, 400);
+      }, 500);
 
       const removeTimer = setTimeout(() => {
         setVisible(false);
         if (onFinished) onFinished();
-      }, 1000);
+      }, 1200);
 
       return () => {
         clearTimeout(fadeTimer);
@@ -48,56 +48,102 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
 
   return (
     <div
-      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-[#faf8f5] via-white to-[#f5f1ea] transition-all duration-500 ease-in-out ${
-        fadeAway ? "opacity-0 scale-105 pointer-events-none" : "opacity-100 scale-100"
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-white transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        fadeAway ? "opacity-0 scale-[1.02] pointer-events-none" : "opacity-100 scale-100"
       }`}
     >
-      {/* Dynamic Glowing Luxury Accent in Background */}
-      <div className="absolute w-[450px] h-[450px] rounded-full bg-radial from-[#c5a059]/10 via-[#c5a059]/1 to-transparent blur-3xl animate-pulse pointer-events-none z-0" />
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes subtle-fade-in-up {
+          0% {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-emblem {
+          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-title {
+          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+          opacity: 0;
+        }
+        .animate-tagline {
+          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+          opacity: 0;
+        }
+        .animate-loader {
+          animation: subtle-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+          opacity: 0;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-emblem, .animate-title, .animate-tagline, .animate-loader {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+          }
+        }
+      `}} />
 
-      {/* Premium Glass Card Container */}
-      <div className="relative z-10 flex flex-col items-center bg-white/50 border border-white/90 shadow-[0_32px_64px_-16px_rgba(45,35,20,0.06)] backdrop-blur-2xl rounded-3xl px-12 py-16 max-w-sm w-full mx-4 text-center">
+      {/* Decorative Ultra-soft Radial Ambient Light */}
+      <div 
+        className="absolute w-[600px] h-[600px] rounded-full bg-radial from-[#c5a059]/5 via-transparent to-transparent blur-3xl pointer-events-none z-0" 
+        style={{ transform: 'translate3d(0,0,0)' }}
+      />
+
+      <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-8 text-center select-none">
         
-        {/* Animated Brand Emblem */}
-        <div className="w-20 h-20 rounded-2xl bg-[#c5a059]/10 border border-[#c5a059]/20 shadow-inner flex items-center justify-center mb-8 relative">
-          <div className="absolute inset-0 rounded-2xl bg-[#c5a059]/20 animate-ping opacity-30" />
-          <svg 
-            className="w-10 h-10 text-[#a07e3c] animate-pulse" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="1.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            viewBox="0 0 24 24"
-          >
-            <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
-            <path d="M7 2v20" />
-            <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Z" />
-            <path d="M19 15v7" />
-          </svg>
+        {/* Sleek Floating Icon */}
+        <div className="animate-emblem mb-8 relative flex items-center justify-center">
+          <div className="absolute inset-0 w-16 h-16 rounded-full bg-[#c5a059]/[0.02] border border-[#c5a059]/[0.04] animate-pulse" />
+          <div className="relative w-16 h-16 rounded-full bg-white border border-[#c5a059]/20 shadow-[0_8px_16px_rgba(0,0,0,0.02)] flex items-center justify-center">
+            <svg 
+              className="w-7 h-7 text-[#a07e3c]" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="1.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+              <path d="M7 2v20" />
+              <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Z" />
+              <path d="M19 15v7" />
+            </svg>
+          </div>
         </div>
 
-        {/* Business Title */}
-        <h1 className="text-3xl font-black tracking-widest text-[#2f2515] uppercase mb-2 font-serif select-none">
+        {/* Business Title - Clean, elegant typography */}
+        <h1 className="animate-title text-[2.75rem] font-bold tracking-tight text-[#2f2515] uppercase font-serif mb-3 text-wrap-balance">
           {businessName}
         </h1>
 
-        <p className="text-[10px] font-bold tracking-[0.4em] text-[#c5a059] uppercase mb-10 select-none">
+        <p className="animate-tagline text-[11px] font-semibold tracking-[0.5em] text-[#c5a059] uppercase mb-12">
           Gastronomy Redefined
         </p>
 
-        {/* Custom Progress Bar */}
-        <div className="w-full h-1.5 bg-[#f5f1f5]/30 border border-[#c5a059]/15 rounded-full overflow-hidden relative">
-          <div 
-            className="h-full bg-gradient-to-r from-[#c5a059] to-[#ebd7a7] rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        {/* Progress Bar Area */}
+        <div className="animate-loader w-full flex flex-col items-center">
+          {/* Extremely thin elegant loading bar */}
+          <div className="w-48 h-[2px] bg-slate-100 rounded-full overflow-hidden relative">
+            <div 
+              className="h-full bg-gradient-to-r from-[#c5a059] to-[#ebd7a7] rounded-full transition-[width] duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
 
-        {/* Progress Percent */}
-        <span className="text-[10px] font-bold font-mono tracking-widest text-[#a07e3c] mt-3 select-none">
-          {progress}%
-        </span>
+          <span className="text-[10px] font-bold font-mono tracking-widest text-[#a07e3c] mt-4">
+            {progress}%
+          </span>
+          
+          <span className="text-[10px] font-bold tracking-[0.2em] text-[#c5a059]/65 uppercase mt-2">
+            Loading…
+          </span>
+        </div>
       </div>
     </div>
   );
