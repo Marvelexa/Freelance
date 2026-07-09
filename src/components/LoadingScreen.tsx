@@ -11,9 +11,10 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    // Slower increment to match the unblur reveal wave speed
     const interval = setInterval(() => {
       setProgress((old) => {
-        const increment = Math.floor(Math.random() * 12) + 6;
+        const increment = Math.floor(Math.random() * 3) + 2; // Increments by 2% to 4%
         const next = old + increment;
         if (next >= 100) {
           clearInterval(interval);
@@ -21,7 +22,7 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
         }
         return next;
       });
-    }, 100);
+    }, 100); // Fills in approx 3 to 4 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -30,12 +31,12 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
     if (progress === 100) {
       const fadeTimer = setTimeout(() => {
         setFadeAway(true);
-      }, 500);
+      }, 600);
 
       const removeTimer = setTimeout(() => {
         setVisible(false);
         if (onFinished) onFinished();
-      }, 1200);
+      }, 1400);
 
       return () => {
         clearTimeout(fadeTimer);
@@ -48,16 +49,16 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
 
   return (
     <div
-      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black transition-[opacity,transform] duration-750 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        fadeAway ? "opacity-0 scale-[1.03] pointer-events-none" : "opacity-100 scale-100"
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-white transition-[opacity,transform] duration-750 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        fadeAway ? "opacity-0 scale-[1.02] pointer-events-none" : "opacity-100 scale-100"
       }`}
     >
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes blur-reveal {
+        @keyframes blur-reveal-goldmine {
           0% {
             opacity: 0;
             filter: blur(16px);
-            transform: scale(1.12);
+            transform: scale(1.1);
           }
           100% {
             opacity: 1;
@@ -72,28 +73,29 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
         .animate-blur-char {
           display: inline-block;
           opacity: 0;
-          animation: blur-reveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          color: #0f172a;
+          animation: blur-reveal-goldmine 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .animate-subtle-fade {
-          animation: subtle-fade 1.2s ease-in-out forwards;
+          animation: subtle-fade 1s ease-in-out forwards;
         }
       `}} />
 
-      {/* Decorative Subtle Dark Radial Ambient Light */}
+      {/* Decorative Ultra-soft Radial Ambient Light */}
       <div 
-        className="absolute w-[500px] h-[500px] rounded-full bg-radial from-zinc-900/50 via-transparent to-transparent blur-3xl pointer-events-none z-0" 
+        className="absolute w-[600px] h-[600px] rounded-full bg-radial from-slate-100/50 via-transparent to-transparent blur-3xl pointer-events-none z-0" 
         style={{ transform: 'translate3d(0,0,0)' }}
       />
 
       <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-8 text-center select-none">
         
-        {/* Business Title - Cinematic Letter-by-Letter Blur Reveal */}
-        <h1 className="text-[2.85rem] font-bold tracking-[0.1em] text-white uppercase font-sans mb-8">
+        {/* Business Title - Light Cinematic Letter-by-Letter Blur Reveal */}
+        <h1 className="text-[2.75rem] font-black tracking-[0.12em] uppercase font-sans mb-8">
           {businessName.split("").map((char, index) => (
             <span 
               key={index} 
               className="animate-blur-char" 
-              style={{ animationDelay: `${index * 0.12}s` }}
+              style={{ animationDelay: `${index * 0.08}s` }}
             >
               {char === " " ? "\u00A0" : char}
             </span>
@@ -101,15 +103,15 @@ export function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) 
         </h1>
 
         {/* Extremely thin elegant loading bar */}
-        <div className="animate-subtle-fade w-48 h-[1px] bg-zinc-900 rounded-full overflow-hidden relative mb-4">
+        <div className="animate-subtle-fade w-48 h-[1px] bg-slate-100 rounded-full overflow-hidden relative mb-4">
           <div 
-            className="h-full bg-white rounded-full transition-[width] duration-300 ease-out"
+            className="h-full bg-slate-900 rounded-full transition-[width] duration-300 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
 
         {/* Cinematic Subtitle */}
-        <p className="animate-subtle-fade text-[9px] font-medium tracking-[0.4em] text-zinc-500 uppercase">
+        <p className="animate-subtle-fade text-[9px] font-bold tracking-[0.4em] text-slate-400 uppercase">
           LEAD DISCOVERY & AUTOMATION PLATFORM
         </p>
       </div>
