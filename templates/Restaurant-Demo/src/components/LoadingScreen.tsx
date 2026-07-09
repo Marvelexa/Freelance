@@ -6,103 +6,70 @@ interface LoadingScreenProps {
 }
 
 export default function LoadingScreen({ businessName, onFinished }: LoadingScreenProps) {
+  const [progress, setProgress] = useState(0);
   const [fadeAway, setFadeAway] = useState(false);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const fadeTimer = setTimeout(() => {
-      setFadeAway(true);
-    }, 2000);
+    const interval = setInterval(() => {
+      setProgress((old) => {
+        const increment = Math.floor(Math.random() * 15) + 5;
+        const next = old + increment;
+        if (next >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return next;
+      });
+    }, 100);
 
-    const removeTimer = setTimeout(() => {
-      setVisible(false);
-      if (onFinished) onFinished();
-    }, 2600);
+    return () => clearInterval(interval);
+  }, []);
 
-    return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(removeTimer);
-    };
-  }, [onFinished]);
+  useEffect(() => {
+    if (progress === 100) {
+      const fadeTimer = setTimeout(() => {
+        setFadeAway(true);
+      }, 400);
+
+      const removeTimer = setTimeout(() => {
+        setVisible(false);
+        if (onFinished) onFinished();
+      }, 1000);
+
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(removeTimer);
+      };
+    }
+  }, [progress, onFinished]);
 
   if (!visible) return null;
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 99999,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0c0a09 0%, #030303 60%, #000000 100%)',
-        opacity: fadeAway ? 0 : 1,
-        transform: fadeAway ? 'scale(1.05)' : 'scale(1)',
-        transition: 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-        pointerEvents: fadeAway ? 'none' : 'auto',
-      }}
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-neutral-950 via-[#120f0a] to-black transition-all duration-500 ease-in-out ${
+        fadeAway ? "opacity-0 scale-105 pointer-events-none" : "opacity-100 scale-100"
+      }`}
     >
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes rest-shimmer {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes rest-barProgress {
-          0% { transform: translateX(-100%); }
-          50% { transform: translateX(20%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes rest-pulse-ring {
-          0%, 100% { transform: scale(0.98); opacity: 0.15; }
-          50% { transform: scale(1.03); opacity: 0.35; }
-        }
-        .rest-glowing-circle {
-          animation: rest-pulse-ring 3s ease-in-out infinite;
-        }
-        .rest-shimmer-text {
-          background: linear-gradient(90deg, #C5A059, #ffffff, #9A7B3E, #ffffff, #C5A059);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          animation: rest-shimmer 4s linear infinite;
-        }
-      `}} />
+      {/* Dynamic Glowing Accent in Background */}
+      <div className="absolute w-[450px] h-[450px] rounded-full bg-radial from-[#c5a059]/10 via-[#c5a059]/1 to-transparent blur-3xl animate-pulse pointer-events-none z-0" />
 
-      {/* Decorative Glowing Backdrop */}
-      <div 
-        className="rest-glowing-circle"
-        style={{
-          position: 'absolute',
-          width: '500px',
-          height: '500px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(197, 160, 89, 0.08) 0%, rgba(197, 160, 89, 0) 70%)',
-          filter: 'blur(40px)',
-          zIndex: 0,
-        }}
-      />
-
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* Animated Icon Ring */}
-        <div 
-          style={{
-            width: '84px',
-            height: '84px',
-            borderRadius: '24px',
-            border: '1px solid rgba(197, 160, 89, 0.15)',
-            background: 'rgba(197, 160, 89, 0.03)',
-            backdropFilter: 'blur(20px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '32px',
-            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-          }}
-        >
-          <svg style={{ width: '36px', height: '36px', fill: 'none', stroke: '#C5A059', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }} viewBox="0 0 24 24">
+      {/* Premium Glass Card Container */}
+      <div className="relative z-10 flex flex-col items-center bg-[#181512]/30 border border-[#c5a059]/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] backdrop-blur-2xl rounded-3xl px-12 py-16 max-w-sm w-full mx-4 text-center">
+        
+        {/* Animated Brand Emblem */}
+        <div className="w-20 h-20 rounded-2xl bg-[#c5a059]/10 border border-[#c5a059]/20 shadow-inner flex items-center justify-center mb-8 relative">
+          <div className="absolute inset-0 rounded-2xl bg-[#c5a059]/20 animate-ping opacity-30" />
+          <svg 
+            className="w-10 h-10 text-[#c5a059] animate-pulse" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="1.5" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            viewBox="0 0 24 24"
+          >
             <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
             <path d="M7 2v20" />
             <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Z" />
@@ -110,62 +77,35 @@ export default function LoadingScreen({ businessName, onFinished }: LoadingScree
           </svg>
         </div>
 
-        {/* Business Name */}
+        {/* Business Title */}
         <h1 
-          className="rest-shimmer-text"
+          className="text-3xl font-black tracking-widest text-[#fbf8f3] uppercase mb-2 font-serif select-none"
           style={{
-            fontSize: '2.5rem',
-            fontWeight: 900,
-            letterSpacing: '0.25em',
-            textTransform: 'uppercase',
-            textAlign: 'center',
-            margin: 0,
-            padding: '0 24px',
-            fontFamily: 'Playfair Display, Georgia, serif',
+            background: "linear-gradient(90deg, #c5a059, #ffffff, #9a7b3e, #ffffff, #c5a059)",
+            backgroundSize: "200% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent"
           }}
         >
           {businessName}
         </h1>
 
-        <p 
-          style={{
-            color: '#C5A059',
-            fontSize: '0.7rem',
-            fontWeight: 600,
-            letterSpacing: '0.4em',
-            textTransform: 'uppercase',
-            marginTop: '16px',
-            opacity: 0.5,
-          }}
-        >
+        <p className="text-[10px] font-bold tracking-[0.4em] text-[#c5a059]/80 uppercase mb-10 select-none">
           Gastronomy Redefined
         </p>
 
-        {/* Loading Progress Bar */}
-        <div 
-          style={{
-            width: '160px',
-            height: '2px',
-            background: 'rgba(197, 160, 89, 0.1)',
-            borderRadius: '999px',
-            marginTop: '48px',
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
+        {/* Custom Progress Bar */}
+        <div className="w-full h-1.5 bg-[#1f1a14] border border-[#c5a059]/5 rounded-full overflow-hidden relative">
           <div 
-            style={{
-              position: 'absolute',
-              insetY: 0,
-              left: 0,
-              width: '60%',
-              height: '100%',
-              background: 'linear-gradient(95deg, transparent, #ffffff, #C5A059, transparent)',
-              borderRadius: '999px',
-              animation: 'rest-barProgress 1.6s ease-in-out infinite',
-            }}
+            className="h-full bg-gradient-to-r from-[#c5a059] to-[#ebd7a7] rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
           />
         </div>
+
+        {/* Progress Percent */}
+        <span className="text-[10px] font-bold font-mono tracking-widest text-zinc-500 mt-3 select-none">
+          {progress}%
+        </span>
       </div>
     </div>
   );
