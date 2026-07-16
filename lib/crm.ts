@@ -105,17 +105,19 @@ export async function sendWhatsAppViaCRM(
 
     const payload = isVideo ? {
       phone: cleanPhone,
+      contact_name: name || undefined,
       message_type: "template",
-      template_name: "website_outreach_soft",
+      template_name: "nexvora_template",
       template_language: "en",
       template_message_params: {
         body: [name || "there"], // Pass the customer's name dynamically to the template
         headerMediaUrl: proxiedMediaUrl
       },
-      content_text: `Hello! I made a personalized video and sample website design for ${name || "there"} — saw your amazing reviews about your beautiful collection of ethnic wear and the extremely friendly, attentive staff. Your clothing store has such a great reputation, and it truly deserves to show up properly online with a premium web presence. I recorded a quick video walkthrough showing how we can transform your digital storefront, get it live in just 1 week, and integrate complete premium features to attract more customers. I have attached the video here.`, // Override old AI text with exact template text so CRM UI shows the right message
+      content_text: `Hi, Prince from Nexvora here.\n\nI came across ${name || "there"} and noticed your products have strong potential, but your online presence could do more to turn visitors into customers.\n\nI created a quick demo showing how a premium website experience could help your brand look more professional and make buying easier.\n\nI’ve attached it — can I share a few ideas?`, // Override old AI text with exact template text so CRM UI shows the right message
       media_url: proxiedMediaUrl // Add media_url to the root so CRM UI displays the video
     } : {
       phone: cleanPhone,
+      contact_name: name || undefined,
       message_type: "text",
       content_text: message
     };

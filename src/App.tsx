@@ -15,6 +15,10 @@ export default function App() {
   const [showLoading, setShowLoading] = useState(true);
 
   useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      setShowLoading(false);
+    }, 2500);
+
     const unsubscribe = initAuth(
       (currentUser) => {
         setUser(currentUser);
@@ -23,7 +27,10 @@ export default function App() {
         setUser(null);
       }
     );
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsubscribe();
+    };
   }, []);
 
   return (

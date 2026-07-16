@@ -35,6 +35,43 @@ export function Outreach() {
 
   const clearLogs = () => setLogs([]);
 
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+
+  const handleCreateChat = async () => {
+    if (!phone.trim()) {
+      addLog("error", "Validation error: Recipient phone number is required to initialize chat.");
+      return;
+    }
+
+    setIsCreatingChat(true);
+    addLog("info", `Initiating keyless database sync to create chat for "${phone.trim()}"...`);
+
+    try {
+      const response = await fetch("/api/whatsapp/create_chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          phone: phone.trim(),
+          name: phone.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status} Error`);
+      }
+
+      addLog("success", `Successfully created chat in WACRM inbox! Contact ID: ${data.contactId || "N/A"}`);
+    } catch (err: any) {
+      addLog("error", `Error creating chat: ${err.message || String(err)}`);
+    } finally {
+      setIsCreatingChat(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!phone.trim()) {
       addLog("error", "Validation error: Recipient phone number is required.");
@@ -202,10 +239,10 @@ export function Outreach() {
                 </div>
               </div>
               
-              <div className="pt-6">
+              <div className="pt-6 space-y-3">
                 <Button 
                   onClick={handleSend} 
-                  disabled={isSending} 
+                  disabled={isSending || isCreatingChat} 
                   className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold gap-2 py-6 text-base rounded-lg transition-all duration-300 transform active:scale-[0.98] shadow-lg shadow-emerald-500/20"
                 >
                   {isSending ? (
@@ -217,6 +254,24 @@ export function Outreach() {
                     <>
                       <Send className="w-5 h-5" /> 
                       Send WhatsApp via CRM
+                    </>
+                  )}
+                </Button>
+
+                <Button 
+                  onClick={handleCreateChat} 
+                  disabled={isSending || isCreatingChat} 
+                  className="w-full bg-transparent hover:bg-sky-500/10 text-sky-400 border border-sky-500/30 hover:border-sky-500 font-semibold gap-2 py-6 text-base rounded-lg transition-all duration-300 transform active:scale-[0.98]"
+                >
+                  {isCreatingChat ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin text-sky-400" />
+                      Creating Chat in Inbox...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-5 h-5 text-sky-400" /> 
+                      Create Chat in WACRM Inbox (No Message)
                     </>
                   )}
                 </Button>
