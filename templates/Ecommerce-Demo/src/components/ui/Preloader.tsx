@@ -3,22 +3,45 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const LOADING_STEPS = [
-  "Curating your wardrobe...",
-  "Sourcing premium fabrics...",
-  "Powering up Marvelexa...",
-  "Preparing the runway...",
-  "Final quality check..."
-];
+const renderStylizedName = (name: string) => {
+  return name.split("").map((char, index) => {
+    if (char === "A" || char === "a") {
+      return (
+        <span key={index} className="stylized-a text-accent-blue">
+          Λ
+        </span>
+      );
+    }
+    return char;
+  });
+};
 
 interface PreloaderProps {
   onComplete: () => void;
 }
 
 export default function Preloader({ onComplete }: PreloaderProps) {
+  const [businessName, setBusinessName] = useState("MARVELEXA");
   const [progress, setProgress] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [isDone, setIsDone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const name = new URLSearchParams(window.location.search).get("name");
+      if (name) {
+        setBusinessName(name.toUpperCase());
+      }
+    }
+  }, []);
+
+  const loadingSteps = [
+    "Curating your wardrobe...",
+    "Sourcing premium fabrics...",
+    `Powering up ${businessName.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}...`,
+    "Preparing the runway...",
+    "Final quality check..."
+  ];
 
   useEffect(() => {
     // Dynamic organic progress updates
@@ -38,7 +61,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
     }, 100);
 
     const stepInterval = setInterval(() => {
-      setStepIndex((prev) => (prev + 1) % LOADING_STEPS.length);
+      setStepIndex((prev) => (prev + 1) % loadingSteps.length);
     }, 500);
 
     return () => {
@@ -95,9 +118,9 @@ export default function Preloader({ onComplete }: PreloaderProps) {
           <motion.h1 
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="font-sans font-black tracking-[0.25em] text-3xl uppercase text-slate-800"
+            className="font-sans font-black tracking-[0.25em] text-3xl uppercase text-slate-800 text-center"
           >
-            M<span className="stylized-a text-accent-blue">Λ</span>RVELEX<span className="stylized-a text-accent-blue">Λ</span>
+            {renderStylizedName(businessName)}
           </motion.h1>
           
           <div className="flex items-center gap-2">
@@ -130,7 +153,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
                   transition={{ duration: 0.3, ease: "easeOut" }}
                   className="text-[9px] font-black uppercase tracking-widest text-slate-400 text-center"
                 >
-                  {LOADING_STEPS[stepIndex]}
+                  {loadingSteps[stepIndex]}
                 </motion.p>
               )}
             </AnimatePresence>
