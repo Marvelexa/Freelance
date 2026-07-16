@@ -1,6 +1,0 @@
-{
-  "name": "Nexvora E-commerce",
-  "description": "A premium, motion-rich ecommerce landing page built with React and Tailwind CSS.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

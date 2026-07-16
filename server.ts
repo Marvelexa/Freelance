@@ -412,7 +412,7 @@ async function startServer() {
   
   // Serve React Templates
   app.use('/templates/cafe', express.static(path.join(process.cwd(), 'templates', 'Cafe-Demo', 'dist')));
-  app.use('/templates/ecommerce', express.static(path.join(process.cwd(), 'templates', 'Ecommerce-Demo', 'dist')));
+  app.use('/templates/ecommerce', express.static(path.join(process.cwd(), 'templates', 'Ecommerce-Demo', 'out')));
   app.use('/templates/restaurant', express.static(path.join(process.cwd(), 'templates', 'Restaurant-Demo', 'dist')));
 
   // API Routes
@@ -1699,18 +1699,31 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
           const targetUrl = `http://localhost:${PORT}/templates/${templateType}?name=${encodeURIComponent(name)}&category=${encodeURIComponent(category || "")}&phone=${encodeURIComponent(phone || "")}`;
           console.log(`[Outreach Playwright] Navigating to: ${targetUrl}`);
           await page.goto(targetUrl, { waitUntil: "load", timeout: 60000 });
-          await page.waitForTimeout(600); // Wait for page to settle
+          
+          // Wait for the cinematic loading screen to fully animate and disappear
+          // The Nexvora-style loader takes ~3-4s (progress fill + 1.4s fade-out)
+          try {
+            await page.waitForFunction(() => {
+              // Loading screen has z-[99999] - wait until no fixed overlay exists
+              const loader = document.querySelector('[class*="z-[99999]"]');
+              return !loader;
+            }, { timeout: 15000 });
+            console.log(`[Outreach Playwright] Loading screen animation completed`);
+          } catch (e) {
+            console.log(`[Outreach Playwright] Loading screen timeout, continuing...`);
+          }
+          await page.waitForTimeout(800); // Extra settle time after loader disappears
 
-          // Calculate remaining time to hit exactly 20 seconds
-          // We want: settle (600) + scrollDown + bottomWait (600) + scrollUp (1000) + finalWait = 20000
+          // Calculate remaining time to hit exactly 30 seconds
+          // We want: settle (600) + scrollDown + bottomWait (600) + scrollUp (1000) + finalWait = 30000
           const elapsedSoFar = Date.now() - recordingStart;
-          const totalTarget = 18400;
+          const totalTarget = 28400;
           const fixedTimes = 600 + 1000; // bottom wait + scroll up
           let scrollDownDuration = totalTarget - elapsedSoFar - fixedTimes;
           
-          // Ensure scrollDownDuration is at least 15 seconds for a slow, smooth scroll down
-          if (scrollDownDuration < 15000) {
-            scrollDownDuration = 15000;
+          // Ensure scrollDownDuration is at least 25 seconds for a slow, smooth scroll down
+          if (scrollDownDuration < 25000) {
+            scrollDownDuration = 25000;
           }
 
           console.log(`[Outreach Playwright] Dynamic Scroll Down Duration: ${scrollDownDuration}ms`);
@@ -1767,9 +1780,9 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
             });
           })()`);
 
-          // 5. Final wait to ensure total video duration is exactly 20.0 seconds
+          // 5. Final wait to ensure total video duration is exactly 30.0 seconds
           const finalElapsed = Date.now() - recordingStart;
-          const finalWait = 20000 - finalElapsed;
+          const finalWait = 30000 - finalElapsed;
           if (finalWait > 0) {
             await page.waitForTimeout(finalWait);
           }
@@ -1987,6 +2000,46 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
     } catch (error: any) {
       console.error("[Zip Error]", error);
       res.status(500).json({ error: error.message || "Failed to generate zip archive" });
+    }
+  });
+
+  app.post("/api/whatsapp/create_chat", async (req, res) => {
+    const { phone, name } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    try {
+      if (!isSupabaseConfigured) {
+        return res.status(500).json({ error: "Supabase is not configured in CRM" });
+      }
+
+      const { userId, accountId } = await resolveActiveUserAndAccount();
+      const contactId = await syncLeadToSupabase({ name: name || phone, phone });
+
+      if (!contactId) {
+        return res.status(500).json({ error: "Failed to create contact in Supabase" });
+      }
+
+      // Check if conversation already has messages. If not, log initial message.
+      const convs = await querySupabase(`conversations?account_id=eq.${accountId}&contact_id=eq.${contactId}&limit=1`);
+      let conversationId = convs && convs.length > 0 ? convs[0].id : null;
+
+      let hasMessages = false;
+      if (conversationId) {
+        const msgs = await querySupabase(`messages?conversation_id=eq.${conversationId}&limit=1`);
+        if (msgs && msgs.length > 0) {
+          hasMessages = true;
+        }
+      }
+
+      if (!hasMessages) {
+        await logMessageToCRM(contactId, userId, accountId, "Chat initialized manually.");
+      }
+
+      res.json({ success: true, contactId, conversationId });
+    } catch (error: any) {
+      console.error("[WhatsApp Create Chat Error]", error);
+      res.status(500).json({ error: error.message || "Failed to create chat" });
     }
   });
 
