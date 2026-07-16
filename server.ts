@@ -413,6 +413,7 @@ async function startServer() {
   // Serve React Templates
   app.use('/templates/cafe', express.static(path.join(process.cwd(), 'templates', 'Cafe-Demo', 'dist')));
   app.use('/templates/ecommerce', express.static(path.join(process.cwd(), 'templates', 'Ecommerce-Demo', 'out')));
+  app.use('/_next', express.static(path.join(process.cwd(), 'templates', 'Ecommerce-Demo', 'out', '_next')));
   app.use('/templates/restaurant', express.static(path.join(process.cwd(), 'templates', 'Restaurant-Demo', 'dist')));
 
   // API Routes
