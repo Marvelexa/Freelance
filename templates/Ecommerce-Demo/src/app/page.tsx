@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
-import Lenis from "lenis";
+
 
 // Sections
 import Header from "@/components/sections/Header";
@@ -20,32 +20,15 @@ import Preloader from "@/components/ui/Preloader";
 export default function Home() {
   const [loading, setLoading] = useState(true);
 
-  // Initialize Lenis smooth scroll
+  // Prevent scrolling while loading
   useEffect(() => {
-    // Prevent scrolling while loading
     if (loading) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
     }
 
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-    });
-
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-
-    if (!loading) {
-      requestAnimationFrame(raf);
-    }
-
     return () => {
-      lenis.destroy();
       document.body.style.overflow = "unset";
     };
   }, [loading]);
