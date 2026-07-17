@@ -1683,7 +1683,17 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
 
       // 2. Playwright Video Recording with Auto-Scroll
       let recordingStart = Date.now();
-      const browser = await launchBrowser();
+      const isWindows = process.platform === "win32";
+      const browser = await launchBrowser({
+        headless: isWindows ? false : true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--ignore-gpu-blocklist",
+          "--enable-gpu-rasterization",
+          "--use-gl=angle",
+        ]
+      });
       rawVideoPath = "";
       try {
         const context = await browser.newContext({
@@ -1729,55 +1739,43 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
 
           console.log(`[Outreach Playwright] Dynamic Scroll Down Duration: ${scrollDownDuration}ms`);
 
-          // 2. Butter smooth scroll down over dynamic scrollDownDuration using requestAnimationFrame (60fps and dynamic height)
+          // 2. Butter smooth scroll down over dynamic scrollDownDuration using setInterval (forcing consistent 60fps frame capturing)
           await page.evaluate(`(async () => {
             await new Promise((resolve) => {
               const scrollDuration = ${scrollDownDuration};
-              let start;
-              
-              function step(timestamp) {
-                if (!start) start = timestamp;
-                const elapsed = timestamp - start;
+              const start = Date.now();
+              const interval = setInterval(() => {
+                const elapsed = Date.now() - start;
                 const progress = Math.min(elapsed / scrollDuration, 1);
-                
                 const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
                 window.scrollTo(0, progress * scrollHeight);
-                
-                if (progress < 1) {
-                  window.requestAnimationFrame(step);
-                } else {
+                if (progress >= 1) {
+                  clearInterval(interval);
                   resolve();
                 }
-              }
-              window.requestAnimationFrame(step);
+              }, 16);
             });
           })()`);
 
           // 3. Hold at the bottom for 0.6 seconds
           await page.waitForTimeout(600);
 
-          // 4. Smooth scroll back to top over exactly 1 second using requestAnimationFrame (60fps)
+          // 4. Smooth scroll back to top over exactly 1 second using setInterval (60fps)
           await page.evaluate(`(async () => {
             await new Promise((resolve) => {
               const scrollDuration = 1000; // 1 second
-              let start;
+              const start = Date.now();
               const initialScrollY = window.scrollY;
-              
-              function step(timestamp) {
-                if (!start) start = timestamp;
-                const elapsed = timestamp - start;
+              const interval = setInterval(() => {
+                const elapsed = Date.now() - start;
                 const progress = Math.min(elapsed / scrollDuration, 1);
-                
                 window.scrollTo(0, initialScrollY - (progress * initialScrollY));
-                
-                if (progress < 1) {
-                  window.requestAnimationFrame(step);
-                } else {
+                if (progress >= 1) {
+                  clearInterval(interval);
                   window.scrollTo(0, 0); // ensure perfect snap to top
                   resolve();
                 }
-              }
-              window.requestAnimationFrame(step);
+              }, 16);
             });
           })()`);
 
