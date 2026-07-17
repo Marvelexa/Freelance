@@ -1683,17 +1683,7 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
 
       // 2. Playwright Video Recording with Auto-Scroll
       let recordingStart = Date.now();
-      const isWindows = process.platform === "win32";
-      const browser = await launchBrowser({
-        headless: isWindows ? false : true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--ignore-gpu-blocklist",
-          "--enable-gpu-rasterization",
-          "--use-gl=angle",
-        ]
-      });
+      const browser = await launchBrowser();
       rawVideoPath = "";
       try {
         const context = await browser.newContext({
@@ -1705,6 +1695,7 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
         });
         try {
           const page = await context.newPage();
+          page.setDefaultTimeout(90000);
           recordingStart = Date.now(); // Reset recording start to exact moment page is created
           
           const targetUrl = `http://localhost:${PORT}/templates/${templateType}?name=${encodeURIComponent(name)}&category=${encodeURIComponent(category || "")}&phone=${encodeURIComponent(phone || "")}`;
