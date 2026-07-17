@@ -1706,9 +1706,8 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
           // The Nexvora-style loader takes ~3-4s (progress fill + 1.4s fade-out)
           try {
             await page.waitForFunction(() => {
-              // Loading screen has z-[99999] - wait until no fixed overlay exists
-              const loader = document.querySelector('[class*="z-[99999]"]');
-              return !loader;
+              // Wait until body overflow is unset (preloader finished and hidden/removed)
+              return document.body.style.overflow !== "hidden";
             }, { timeout: 15000 });
             console.log(`[Outreach Playwright] Loading screen animation completed`);
           } catch (e) {
