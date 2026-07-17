@@ -1715,17 +1715,8 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
           }
           await page.waitForTimeout(800); // Extra settle time after loader disappears
 
-          // Calculate remaining time to hit exactly 30 seconds
-          // We want: settle (600) + scrollDown + bottomWait (600) + scrollUp (1000) + finalWait = 30000
-          const elapsedSoFar = Date.now() - recordingStart;
-          const totalTarget = 28400;
-          const fixedTimes = 600 + 1000; // bottom wait + scroll up
-          let scrollDownDuration = totalTarget - elapsedSoFar - fixedTimes;
-          
-          // Ensure scrollDownDuration is at least 25 seconds for a slow, smooth scroll down
-          if (scrollDownDuration < 25000) {
-            scrollDownDuration = 25000;
-          }
+          // Set scroll duration to 12 seconds for a faster, more engaging scroll speed
+          let scrollDownDuration = 12000;
 
           // Get total scrollable height
           const totalScrollable = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
