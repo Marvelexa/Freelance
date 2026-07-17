@@ -404,7 +404,7 @@ async function generateContentWithFallback(
 
 async function startServer() {
   const app = express();
-  const PORT = 3001;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
   let outreachQueue = Promise.resolve();
 
   app.use(express.json());
