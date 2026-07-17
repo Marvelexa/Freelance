@@ -1727,47 +1727,34 @@ const safeMoveVideo = async (src: string, dest: string, retries = 5, delay = 500
             scrollDownDuration = 25000;
           }
 
-          console.log(`[Outreach Playwright] Dynamic Scroll Down Duration: ${scrollDownDuration}ms`);
+          // Get total scrollable height
+          const totalScrollable = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+          console.log(`[Outreach Playwright] Scroll Down Duration: ${scrollDownDuration}ms | Scrollable height: ${totalScrollable}px`);
 
-          // 2. Butter smooth scroll down over dynamic scrollDownDuration using setInterval (forcing consistent 60fps frame capturing)
-          await page.evaluate(`(async () => {
-            await new Promise((resolve) => {
-              const scrollDuration = ${scrollDownDuration};
-              const start = Date.now();
-              const interval = setInterval(() => {
-                const elapsed = Date.now() - start;
-                const progress = Math.min(elapsed / scrollDuration, 1);
-                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-                window.scrollTo(0, progress * scrollHeight);
-                if (progress >= 1) {
-                  clearInterval(interval);
-                  resolve();
-                }
-              }, 16);
-            });
-          })()`);
+          // 2. Smooth scroll down using mouse.wheel (bypasses any JS/CSS scroll blocking)
+          {
+            const steps = Math.ceil(scrollDownDuration / 50); // one wheel tick every 50ms
+            const pixelsPerStep = totalScrollable / steps;
+            for (let i = 0; i < steps; i++) {
+              await page.mouse.wheel(0, pixelsPerStep);
+              await page.waitForTimeout(50);
+            }
+          }
 
           // 3. Hold at the bottom for 0.6 seconds
           await page.waitForTimeout(600);
 
-          // 4. Smooth scroll back to top over exactly 1 second using setInterval (60fps)
-          await page.evaluate(`(async () => {
-            await new Promise((resolve) => {
-              const scrollDuration = 1000; // 1 second
-              const start = Date.now();
-              const initialScrollY = window.scrollY;
-              const interval = setInterval(() => {
-                const elapsed = Date.now() - start;
-                const progress = Math.min(elapsed / scrollDuration, 1);
-                window.scrollTo(0, initialScrollY - (progress * initialScrollY));
-                if (progress >= 1) {
-                  clearInterval(interval);
-                  window.scrollTo(0, 0); // ensure perfect snap to top
-                  resolve();
-                }
-              }, 16);
-            });
-          })()`);
+          // 4. Smooth scroll back to top using mouse.wheel (negative delta)
+          {
+            const scrollUpDuration = 1000;
+            const currentY = await page.evaluate(() => window.scrollY);
+            const steps = Math.ceil(scrollUpDuration / 50);
+            const pixelsPerStep = currentY / steps;
+            for (let i = 0; i < steps; i++) {
+              await page.mouse.wheel(0, -pixelsPerStep);
+              await page.waitForTimeout(50);
+            }
+          }
 
           // 5. Final wait to ensure total video duration is exactly 30.0 seconds
           const finalElapsed = Date.now() - recordingStart;
